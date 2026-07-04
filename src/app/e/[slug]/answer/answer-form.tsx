@@ -231,7 +231,7 @@ export function AnswerForm({
             <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium">{slot.label}</span>
               <div
-                className="flex gap-2"
+                className="grid grid-cols-3 gap-2 sm:flex"
                 role="radiogroup"
                 aria-label={`${slot.label} の出欠`}
               >
@@ -247,6 +247,7 @@ export function AnswerForm({
                       data-testid={`mark-${item.mark}`}
                       data-slot-id={slot.id}
                       data-active={active ? "true" : "false"}
+                      className="h-11 min-h-11 flex-1"
                     >
                       <span aria-hidden="true">{item.symbol}</span> {item.label}
                     </Button>
@@ -268,10 +269,10 @@ export function AnswerForm({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
         <Button
           type="submit"
-          className="flex-1"
+          className="h-11 min-h-11 flex-1"
           disabled={pending}
           data-testid="answer-submit"
         >
@@ -283,7 +284,10 @@ export function AnswerForm({
         </Button>
         <Link
           href={`/e/${slug}`}
-          className={buttonVariants({ variant: "ghost", className: "flex-1" })}
+          className={buttonVariants({
+            variant: "ghost",
+            className: "h-11 flex-1",
+          })}
         >
           キャンセル
         </Link>

@@ -14,6 +14,7 @@ import { events } from "@/db/schema";
 import { markMeta } from "@/lib/marks";
 import { slotLabel } from "@/lib/slot-label";
 import { type SlotAnswer, tallySlots } from "@/lib/tally";
+import { LiveRefresh } from "./live-refresh";
 import { ShareUrl } from "./share-url";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ export default async function EventPage({
 
   return (
     <main className="flex flex-1 flex-col items-center bg-background px-4 py-10">
+      <LiveRefresh />
       <div className="w-full max-w-4xl space-y-6">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">{event.title}</h1>
