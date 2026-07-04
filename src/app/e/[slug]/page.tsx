@@ -14,6 +14,8 @@ import { events } from "@/db/schema";
 import { markMeta } from "@/lib/marks";
 import { slotLabel } from "@/lib/slot-label";
 import { type SlotAnswer, tallySlots } from "@/lib/tally";
+import { AdminLink } from "./admin-link";
+import { DecidedBanner } from "./decided-banner";
 import { LiveRefresh } from "./live-refresh";
 import { ShareUrl } from "./share-url";
 
@@ -69,6 +71,10 @@ export default async function EventPage({
 
   const hasParticipants = orderedParticipants.length > 0;
 
+  const decidedSlot = event.decidedSlotId
+    ? orderedSlots.find((slot) => slot.id === event.decidedSlotId)
+    : undefined;
+
   return (
     <main className="flex flex-1 flex-col items-center bg-background px-4 py-10">
       <LiveRefresh />
@@ -82,6 +88,17 @@ export default async function EventPage({
           ) : null}
         </header>
 
+        {decidedSlot ? (
+          <DecidedBanner
+            slotLabel={slotLabel(decidedSlot)}
+            startsAt={
+              decidedSlot.startsAt ? decidedSlot.startsAt.toISOString() : null
+            }
+            title={event.title}
+            description={event.description}
+          />
+        ) : null}
+
         <ShareUrl slug={slug} />
 
         <div className="flex flex-wrap items-center gap-3">
@@ -92,6 +109,7 @@ export default async function EventPage({
           >
             回答する
           </Link>
+          <AdminLink slug={slug} />
           <MarkLegend />
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function ShareUrl({ slug }: { slug: string }) {
@@ -22,6 +22,10 @@ export function ShareUrl({ slug }: { slug: string }) {
     }
   }
 
+  const lineShareUrl = url
+    ? `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}`
+    : "";
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
       <Input
@@ -39,6 +43,16 @@ export function ShareUrl({ slug }: { slug: string }) {
       >
         {copied ? "コピーしました" : "URLをコピー"}
       </Button>
+      <a
+        href={lineShareUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="line-share"
+        aria-label="LINEで共有"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        LINEで共有
+      </a>
     </div>
   );
 }
