@@ -10,7 +10,7 @@ export function SiteHeader() {
           className="text-lg font-bold tracking-tight"
           data-testid="site-brand"
         >
-          chosei
+          matenaiyo
         </Link>
         <ThemeToggle />
       </div>

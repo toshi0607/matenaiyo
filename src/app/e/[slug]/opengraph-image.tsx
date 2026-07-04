@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // 毎リクエストの DB クエリ + フォント fetch を避ける(回答数の反映は最大5分遅延で許容)。
 export const revalidate = 300;
 
-export const alt = "chosei イベント";
+export const alt = "matenaiyo イベント";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -55,13 +55,13 @@ export default async function OpengraphImage({
     columns: { id: true, title: true },
   });
 
-  const title = event?.title ?? "chosei";
+  const title = event?.title ?? "matenaiyo";
   const count = event
     ? await db.$count(participants, eq(participants.eventId, event.id))
     : 0;
 
   const label = `回答 ${count} 件`;
-  const glyphs = `${title}${label}chosei — 日程調整0123456789`;
+  const glyphs = `${title}${label}matenaiyo — 日程調整0123456789`;
   const fontData = await loadNotoSansJp(glyphs);
   const fontFamily = fontData ? "Noto Sans JP" : "sans-serif";
 
@@ -88,7 +88,7 @@ export default async function OpengraphImage({
           letterSpacing: "0.05em",
         }}
       >
-        chosei — 日程調整
+        matenaiyo — 日程調整
       </div>
       <div
         style={{

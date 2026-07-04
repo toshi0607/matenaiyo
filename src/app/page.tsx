@@ -27,7 +27,7 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center justify-center bg-background px-4 py-16">
       <div className="w-full max-w-xl space-y-8">
         <div className="space-y-3 text-center">
-          <h1 className="text-4xl font-bold tracking-tight">chosei</h1>
+          <h1 className="text-4xl font-bold tracking-tight">matenaiyo</h1>
           <p className="text-muted-foreground text-lg">
             ログイン不要・URLひとつで完結する、かんたん日程調整
           </p>

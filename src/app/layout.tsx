@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "chosei — かんたん日程調整",
+  title: "matenaiyo — かんたん日程調整",
   description: "ログイン不要・URLひとつで完結する日程調整サービス",
 };
 
