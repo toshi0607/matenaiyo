@@ -5,7 +5,9 @@ import { events, participants } from "@/db/schema";
 
 // DB を読むため Node.js ランタイム(edge では postgres-js が不安定)。
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// OGP は多数のクローラから繰り返し叩かれるため、slug 単位で 5 分 ISR キャッシュし、
+// 毎リクエストの DB クエリ + フォント fetch を避ける(回答数の反映は最大5分遅延で許容)。
+export const revalidate = 300;
 
 export const alt = "chosei イベント";
 export const size = { width: 1200, height: 630 };

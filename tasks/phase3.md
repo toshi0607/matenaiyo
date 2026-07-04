@@ -35,7 +35,7 @@ LINE共有のエンコード、Phase 1/2 不変条件維持も問題なし。
 - [x] **L1(cron 認証の非タイミング安全比較)**: `node:crypto` の `timingSafeEqual` による定数時間比較に変更。
 - [x] **L2(cutoffDate の TZ ずれ・月末オーバーフロー)**: UTC 基準に統一し、月末日は対象月末にクランプ(8/31 の6ヶ月前 → 2/28)。テスト追加。
 
-### follow-up(任意・急がない)
+### follow-up
 
-- **L3**: OGP画像は `force-dynamic` で毎リクエスト DB 読み + フォント fetch。大量クロール時は `revalidate` で短期キャッシュ検討。
-  フォント fetch 失敗時は sans-serif フォールバックで 500 化しない設計は妥当。
+- [x] **L3**: OGP画像を `revalidate = 300`(slug 単位 5分 ISR キャッシュ)に変更。繰り返しクロール時の
+  DB クエリ + フォント fetch を抑制(回答数の反映は最大5分遅延で許容)。フォント fetch 失敗時の sans-serif フォールバックは維持。
