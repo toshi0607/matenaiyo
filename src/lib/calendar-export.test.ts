@@ -79,7 +79,7 @@ describe("buildIcs", () => {
     const ics = buildIcs({ ...base, uid: undefined });
 
     // #then 開始日時ベースの UID になる
-    expect(ics).toContain("UID:20260201T100000Z-chosei");
+    expect(ics).toContain("UID:20260201T100000Z-matenaiyo");
   });
 });
 

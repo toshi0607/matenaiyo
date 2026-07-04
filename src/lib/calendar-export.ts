@@ -51,12 +51,12 @@ export function buildIcs(input: CalendarEventInput): string {
   const start = toIcsUtc(input.startsAt);
   const end = toIcsUtc(resolveEnd(input));
   const dtstamp = toIcsUtc(input.dtstamp ?? new Date());
-  const uid = input.uid ?? `${start}-chosei`;
+  const uid = input.uid ?? `${start}-matenaiyo`;
 
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//chosei//JP",
+    "PRODID:-//matenaiyo//JP",
     "BEGIN:VEVENT",
     `UID:${escapeIcsText(uid)}`,
     `DTSTAMP:${dtstamp}`,
