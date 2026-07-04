@@ -51,13 +51,15 @@ reviewer subagent(新規コンテキスト)による Phase 1 レビュー: **承
 トークン設計(sha256 ハッシュ保存・平文非保存・timingSafeEqual・長さチェック)、権限照合、slotId の event 帰属検証、
 トランザクション整合性、XSS(全入力が React エスケープ)いずれも DESIGN.md 要件を満たすことを確認。
 
-### Phase 2 で対応すべき指摘
+### レビュー指摘への対応(harden/actions-and-ratelimit ブランチで実施済み)
 
-- **M1(締切 TOCTOU)**: `submitAnswer`/`updateAnswer` は `status === "closed"` チェックと INSERT が別トランザクションのため、
-  締切直前の競合で締切後回答が1件通り得る。FK 崩れ等の不整合は起きない。対応案: status を条件に含めた条件付き書き込み。
-- **M2(slug 衝突時の throw)**: nanoid 21 文字の衝突は非現実的だが、UNIQUE 制約違反時に `createEvent` が `ActionResult` を
-  返さず throw し、`new-event-form.tsx` が未 catch。対応案: DB 例外を `{ ok:false }` にラップ(他 Action にも横展開)。
-- **公開前必須**: レート制限(@upstash/ratelimit)未実装。DESIGN.md 非機能要件で「必須」。作成・回答 Action が無制限に叩ける。
+- [x] **M1(締切 TOCTOU)対応**: `submitAnswer`/`updateAnswer` のトランザクション内で
+  `SELECT ... FOR UPDATE` によりイベント行をロックして `status` を再確認。締切と競合しても締切後回答が通らない。
+- [x] **M2(DB 例外の throw)対応**: 全 Server Action の DB 操作を try/catch で包み、例外時は `{ ok:false, error }` を返す。
+  未処理 rejection を防止。
+- [x] **レート制限**: `@upstash/ratelimit` + `@upstash/redis` を導入(`src/lib/rate-limit.ts`)。
+  createEvent(5回/10分)・submitAnswer/updateAnswer(30回/10分)に IP ベース制限。
+  Upstash 未設定時は素通り(ローカル/CI を壊さない)。本番は `UPSTASH_REDIS_REST_URL` / `_TOKEN` を設定。
 
 ### 完了条件の証拠
 

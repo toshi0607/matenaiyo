@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { answers, events, participants, slots } from "@/db/schema";
 import {
+  ANSWER_LIMIT,
+  CREATE_EVENT_LIMIT,
+  checkRateLimit,
+  clientIdentifier,
+} from "@/lib/rate-limit";
+import {
   closeEventSchema,
   createEventSchema,
   decideSlotSchema,
@@ -26,6 +32,8 @@ export type ActionResult<T = null> =
 const INVALID_INPUT = "入力内容が正しくありません";
 const OPERATION_FAILED = "操作を実行できませんでした";
 const EVENT_CLOSED = "このイベントは締め切られています";
+const RATE_LIMITED =
+  "リクエストが多すぎます。しばらく待ってからお試しください。";
 
 function eventPath(slug: string): string {
   return `/e/${slug}`;
@@ -60,28 +68,36 @@ export async function createEvent(
     return { ok: false, error: INVALID_INPUT };
   }
 
+  if (!(await checkRateLimit(CREATE_EVENT_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
+
   const slug = generateSlug();
   const adminToken = generateToken();
 
-  await db.transaction(async (tx) => {
-    const [event] = await tx
-      .insert(events)
-      .values({
-        slug,
-        title: parsed.data.title,
-        description: parsed.data.description,
-        adminToken: hashToken(adminToken),
-      })
-      .returning({ id: events.id });
-    await tx.insert(slots).values(
-      parsed.data.slots.map((slot, index) => ({
-        eventId: event.id,
-        startsAt: slot.startsAt ? new Date(slot.startsAt) : null,
-        label: slot.label ?? null,
-        sortOrder: index,
-      })),
-    );
-  });
+  try {
+    await db.transaction(async (tx) => {
+      const [event] = await tx
+        .insert(events)
+        .values({
+          slug,
+          title: parsed.data.title,
+          description: parsed.data.description,
+          adminToken: hashToken(adminToken),
+        })
+        .returning({ id: events.id });
+      await tx.insert(slots).values(
+        parsed.data.slots.map((slot, index) => ({
+          eventId: event.id,
+          startsAt: slot.startsAt ? new Date(slot.startsAt) : null,
+          label: slot.label ?? null,
+          sortOrder: index,
+        })),
+      );
+    });
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
 
   revalidatePath(eventPath(slug));
   return { ok: true, data: { slug, adminToken } };
@@ -95,6 +111,10 @@ export async function submitAnswer(
     return { ok: false, error: INVALID_INPUT };
   }
   const { slug, name, comment, answers: answerItems } = parsed.data;
+
+  if (!(await checkRateLimit(ANSWER_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   const event = await findEventWithSlots(slug);
   if (!event) {
@@ -110,32 +130,50 @@ export async function submitAnswer(
   }
 
   const editToken = generateToken();
-  const participantId = await db.transaction(async (tx) => {
-    const [participant] = await tx
-      .insert(participants)
-      .values({
-        eventId: event.id,
-        name,
-        comment,
-        editToken: hashToken(editToken),
-      })
-      .returning({ id: participants.id });
-    await tx.insert(answers).values(
-      answerItems.map((item) => ({
-        participantId: participant.id,
-        slotId: item.slotId,
-        mark: item.mark,
-      })),
-    );
-    await tx
-      .update(events)
-      .set({ lastActivityAt: new Date() })
-      .where(eq(events.id, event.id));
-    return participant.id;
-  });
+  let result: { closed: true } | { id: string };
+  try {
+    result = await db.transaction(async (tx) => {
+      // 締切との競合を防ぐため、行ロック下で status を再確認する(TOCTOU 回避)。
+      const [locked] = await tx
+        .select({ status: events.status })
+        .from(events)
+        .where(eq(events.id, event.id))
+        .for("update");
+      if (!locked || locked.status === "closed") {
+        return { closed: true };
+      }
+      const [participant] = await tx
+        .insert(participants)
+        .values({
+          eventId: event.id,
+          name,
+          comment,
+          editToken: hashToken(editToken),
+        })
+        .returning({ id: participants.id });
+      await tx.insert(answers).values(
+        answerItems.map((item) => ({
+          participantId: participant.id,
+          slotId: item.slotId,
+          mark: item.mark,
+        })),
+      );
+      await tx
+        .update(events)
+        .set({ lastActivityAt: new Date() })
+        .where(eq(events.id, event.id));
+      return { id: participant.id };
+    });
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
+
+  if ("closed" in result) {
+    return { ok: false, error: EVENT_CLOSED };
+  }
 
   revalidatePath(eventPath(slug));
-  return { ok: true, data: { participantId, editToken } };
+  return { ok: true, data: { participantId: result.id, editToken } };
 }
 
 export async function updateAnswer(input: unknown): Promise<ActionResult> {
@@ -151,6 +189,10 @@ export async function updateAnswer(input: unknown): Promise<ActionResult> {
     comment,
     answers: answerItems,
   } = parsed.data;
+
+  if (!(await checkRateLimit(ANSWER_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   const event = await findEventWithSlots(slug);
   if (!event) {
@@ -175,24 +217,43 @@ export async function updateAnswer(input: unknown): Promise<ActionResult> {
     return { ok: false, error: INVALID_INPUT };
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(participants)
-      .set({ name, comment, updatedAt: new Date() })
-      .where(eq(participants.id, participant.id));
-    await tx.delete(answers).where(eq(answers.participantId, participant.id));
-    await tx.insert(answers).values(
-      answerItems.map((item) => ({
-        participantId: participant.id,
-        slotId: item.slotId,
-        mark: item.mark,
-      })),
-    );
-    await tx
-      .update(events)
-      .set({ lastActivityAt: new Date() })
-      .where(eq(events.id, event.id));
-  });
+  let result: { closed: true } | { ok: true };
+  try {
+    result = await db.transaction(async (tx) => {
+      // 締切との競合を防ぐため、行ロック下で status を再確認する(TOCTOU 回避)。
+      const [locked] = await tx
+        .select({ status: events.status })
+        .from(events)
+        .where(eq(events.id, event.id))
+        .for("update");
+      if (!locked || locked.status === "closed") {
+        return { closed: true };
+      }
+      await tx
+        .update(participants)
+        .set({ name, comment, updatedAt: new Date() })
+        .where(eq(participants.id, participant.id));
+      await tx.delete(answers).where(eq(answers.participantId, participant.id));
+      await tx.insert(answers).values(
+        answerItems.map((item) => ({
+          participantId: participant.id,
+          slotId: item.slotId,
+          mark: item.mark,
+        })),
+      );
+      await tx
+        .update(events)
+        .set({ lastActivityAt: new Date() })
+        .where(eq(events.id, event.id));
+      return { ok: true };
+    });
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
+
+  if ("closed" in result) {
+    return { ok: false, error: EVENT_CLOSED };
+  }
 
   revalidatePath(eventPath(slug));
   return { ok: true, data: null };
@@ -210,10 +271,14 @@ export async function closeEvent(input: unknown): Promise<ActionResult> {
     return { ok: false, error: OPERATION_FAILED };
   }
 
-  await db
-    .update(events)
-    .set({ status: "closed", lastActivityAt: new Date() })
-    .where(eq(events.id, event.id));
+  try {
+    await db
+      .update(events)
+      .set({ status: "closed", lastActivityAt: new Date() })
+      .where(eq(events.id, event.id));
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
 
   revalidatePath(eventPath(slug));
   return { ok: true, data: null };
@@ -238,10 +303,14 @@ export async function decideSlot(input: unknown): Promise<ActionResult> {
     return { ok: false, error: INVALID_INPUT };
   }
 
-  await db
-    .update(events)
-    .set({ decidedSlotId: slot.id, lastActivityAt: new Date() })
-    .where(eq(events.id, event.id));
+  try {
+    await db
+      .update(events)
+      .set({ decidedSlotId: slot.id, lastActivityAt: new Date() })
+      .where(eq(events.id, event.id));
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
 
   revalidatePath(eventPath(slug));
   return { ok: true, data: null };
@@ -259,25 +328,30 @@ export async function deleteParticipant(input: unknown): Promise<ActionResult> {
     return { ok: false, error: OPERATION_FAILED };
   }
 
-  const deleted = await db.transaction(async (tx) => {
-    const rows = await tx
-      .delete(participants)
-      .where(
-        and(
-          eq(participants.id, participantId),
-          eq(participants.eventId, event.id),
-        ),
-      )
-      .returning({ id: participants.id });
-    if (rows.length === 0) {
-      return false;
-    }
-    await tx
-      .update(events)
-      .set({ lastActivityAt: new Date() })
-      .where(eq(events.id, event.id));
-    return true;
-  });
+  let deleted: boolean;
+  try {
+    deleted = await db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(participants)
+        .where(
+          and(
+            eq(participants.id, participantId),
+            eq(participants.eventId, event.id),
+          ),
+        )
+        .returning({ id: participants.id });
+      if (rows.length === 0) {
+        return false;
+      }
+      await tx
+        .update(events)
+        .set({ lastActivityAt: new Date() })
+        .where(eq(events.id, event.id));
+      return true;
+    });
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
   if (!deleted) {
     return { ok: false, error: OPERATION_FAILED };
   }
