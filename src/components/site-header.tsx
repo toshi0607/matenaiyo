@@ -19,6 +19,7 @@ export function SiteHeader() {
               className="size-5"
               fill="none"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <g transform="rotate(-6 50 50)">
                 <circle cx="50" cy="50" r="26.5" strokeWidth="11" />
