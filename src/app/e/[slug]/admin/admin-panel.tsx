@@ -1,5 +1,6 @@
 "use client";
 
+import { sendGAEvent } from "@next/third-parties/google";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { closeEvent, decideSlot, deleteParticipant } from "@/app/actions";
@@ -52,7 +53,10 @@ export function AdminPanel({
     setReady(true);
   }, [slug]);
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    onSuccess?: () => void,
+  ) {
     setError(null);
     startTransition(async () => {
       const result = await action();
@@ -60,6 +64,7 @@ export function AdminPanel({
         setError(result.error ?? "操作を実行できませんでした");
         return;
       }
+      onSuccess?.();
       router.refresh();
     });
   }
@@ -141,7 +146,10 @@ export function AdminPanel({
                   variant={isDecided ? "default" : "outline"}
                   disabled={pending}
                   onClick={() =>
-                    run(() => decideSlot({ slug, adminToken, slotId: slot.id }))
+                    run(
+                      () => decideSlot({ slug, adminToken, slotId: slot.id }),
+                      () => sendGAEvent("event", "decide_slot"),
+                    )
                   }
                   data-testid={`decide-slot-${slot.id}`}
                 >
