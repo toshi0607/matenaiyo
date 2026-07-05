@@ -16,6 +16,10 @@ import { loadAdminToken } from "@/lib/local-storage";
 export interface AdminSlot {
   id: string;
   label: string;
+  yes: number;
+  maybe: number;
+  no: number;
+  isBest: boolean;
 }
 
 export interface AdminParticipant {
@@ -93,7 +97,8 @@ export function AdminPanel({
         <CardHeader>
           <CardTitle>日程を確定する</CardTitle>
           <CardDescription>
-            確定するとイベントページに確定バナーとカレンダー連携が表示されます。
+            各候補の集計(○参加 / △未定 /
+            ×不参加)を見ながら確定できます。○が最多の候補に「ベスト」が付きます。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -103,8 +108,33 @@ export function AdminPanel({
               <div
                 key={slot.id}
                 className="flex items-center justify-between gap-3 rounded-md border p-2"
+                data-testid="candidate-row"
+                data-best={slot.isBest ? "true" : "false"}
               >
-                <span className="text-sm font-medium">{slot.label}</span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">{slot.label}</span>
+                    {slot.isBest ? (
+                      <span
+                        className="rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+                        data-testid="admin-best-badge"
+                      >
+                        ベスト
+                      </span>
+                    ) : null}
+                  </div>
+                  <div
+                    className="text-muted-foreground mt-0.5 text-xs"
+                    data-testid="slot-tally"
+                  >
+                    <span aria-hidden="true">
+                      ○ {slot.yes}・△ {slot.maybe}・× {slot.no}
+                    </span>
+                    <span className="sr-only">
+                      参加 {slot.yes}、未定 {slot.maybe}、不参加 {slot.no}
+                    </span>
+                  </div>
+                </div>
                 <Button
                   type="button"
                   size="sm"

@@ -39,6 +39,11 @@ test("admin decides a dated slot and calendar links appear", async ({
   // #when 幹事管理画面で日程を確定する
   await page.getByTestId("admin-link").click();
   await expect(page.getByTestId("admin-panel")).toBeVisible();
+
+  // #then 確定画面で各候補の集計(○△×)とベスト表示を確認できる(集計ページに戻らなくてよい)
+  await expect(page.getByTestId("slot-tally").first()).toContainText("○ 1");
+  await expect(page.getByTestId("admin-best-badge").first()).toBeVisible();
+
   const decideButton = page.locator('[data-testid^="decide-slot-"]').first();
   await decideButton.click();
   await expect(decideButton).toHaveText("確定中");

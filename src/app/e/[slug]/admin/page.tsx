@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { slotLabel } from "@/lib/slot-label";
+import { type SlotAnswer, tallySlots } from "@/lib/tally";
 import {
   AdminPanel,
   type AdminParticipant,
@@ -24,7 +25,7 @@ export default async function AdminPage({
     where: eq(events.slug, slug),
     with: {
       slots: true,
-      participants: true,
+      participants: { with: { answers: true } },
     },
   });
 
@@ -32,9 +33,33 @@ export default async function AdminPage({
     notFound();
   }
 
-  const slots: AdminSlot[] = [...event.slots]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((slot) => ({ id: slot.id, label: slotLabel(slot) }));
+  const orderedSlots = [...event.slots].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
+  const allAnswers: SlotAnswer[] = event.participants.flatMap((participant) =>
+    participant.answers.map((answer) => ({
+      slotId: answer.slotId,
+      mark: answer.mark,
+    })),
+  );
+  const tallyBySlot = new Map(
+    tallySlots(
+      orderedSlots.map((slot) => slot.id),
+      allAnswers,
+    ).map((tally) => [tally.slotId, tally]),
+  );
+
+  const slots: AdminSlot[] = orderedSlots.map((slot) => {
+    const tally = tallyBySlot.get(slot.id);
+    return {
+      id: slot.id,
+      label: slotLabel(slot),
+      yes: tally?.yes ?? 0,
+      maybe: tally?.maybe ?? 0,
+      no: tally?.no ?? 0,
+      isBest: tally?.isBest ?? false,
+    };
+  });
 
   const participants: AdminParticipant[] = [...event.participants]
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
