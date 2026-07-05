@@ -1,23 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { selectCurrentMonthDays } from "./helpers";
 
-// 幹事管理: カレンダーモードで starts_at 付き候補を作成 → 回答 → 確定 →
+// 幹事管理: starts_at 付き候補を作成 → 回答 → 確定 →
 // イベントページに確定バナー + .ics/Google カレンダー連携が出ることを検証する。
 test("admin decides a dated slot and calendar links appear", async ({
   page,
 }) => {
-  // #given カレンダーモードで starts_at 付き候補を1件作成する(作成端末に adminToken が保存される)
+  // #given starts_at 付き候補を1件作成する(作成端末に adminToken が保存される)
   await page.goto("/new?title=確定テスト飲み会");
-  await page.getByTestId("mode-calendar").click();
-  await expect(page.getByTestId("calendar-mode")).toBeVisible();
-
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  await page.locator(`[data-day="${ym}-15"] button`).click();
-  await page
-    .getByTestId("calendar-day")
-    .nth(0)
-    .getByTestId("time-preset-19")
-    .click();
+  // 当月の1日を選ぶと既定時刻19:00の starts_at 付き候補が1件できる
+  await selectCurrentMonthDays(page, [15]);
   await expect(page.getByTestId("selected-slot")).toHaveCount(1);
 
   await page.getByTestId("create-submit").click();
@@ -67,7 +59,7 @@ test("non-admin device sees no admin link and a not-recognized notice", async ({
 }) => {
   // #given 作成端末でイベントを作る
   await page.goto("/new?title=非幹事テスト");
-  await page.getByTestId("slots-input").fill("2/1\n2/2");
+  await selectCurrentMonthDays(page, [1, 2]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
   const slug = shareUrl.split("/e/")[1];

@@ -1,32 +1,24 @@
 import { expect, test } from "@playwright/test";
+import { selectCurrentMonthDays } from "./helpers";
 
-// カレンダーモードで候補日 × 時刻テンプレを選んでイベントを作成するフロー
-test("create event via calendar mode with time presets", async ({ page }) => {
-  // #given /new を開いてタイトルを入力
+// カレンダーで候補日を選び、既定時刻+プリセットで候補を作ってイベントを作成するフロー
+test("create event by selecting days and adding a preset time", async ({
+  page,
+}) => {
+  // #given /new を開いてタイトルを確認
   await page.goto("/new?title=カレンダー飲み会");
   await expect(page.getByTestId("title-input")).toHaveValue("カレンダー飲み会");
 
-  // #when カレンダーモードに切り替える
-  await page.getByTestId("mode-calendar").click();
-  await expect(page.getByTestId("calendar-mode")).toBeVisible();
+  // #when 当月の2日を選ぶ(各日に既定時刻19:00が自動で付き、候補2件になる)
+  await selectCurrentMonthDays(page, [10, 15]);
+  await expect(page.getByTestId("selected-slot")).toHaveCount(2);
 
-  // #when 現在表示中の月(=今月)の2日を data-day 属性で確定的に選択する
-  //     (カレンダーは過去日を無効化しないため月移動不要。data-day で日付を一意に特定)
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  await page.locator(`[data-day="${ym}-10"] button`).click();
-  await page.locator(`[data-day="${ym}-15"] button`).click();
-
-  // #then 選択した2日分の時刻プリセット行が表示される
-  await expect(page.getByTestId("calendar-day")).toHaveCount(2);
-
-  // #when それぞれに時刻テンプレを適用(1日目は19:00と12:00の2つ、2日目は19:00)
-  const dayRows = page.getByTestId("calendar-day");
-  await dayRows.nth(0).getByTestId("time-preset-19").click();
-  await dayRows.nth(0).getByTestId("time-preset-12").click();
-  await dayRows.nth(1).getByTestId("time-preset-19").click();
-
-  // #then 作成される候補(slot)が3件になる
+  // #when 1日目に12:00をクイック追加して候補を3件にする
+  await page
+    .getByTestId("calendar-day")
+    .nth(0)
+    .getByTestId("time-preset-12")
+    .click();
   await expect(page.getByTestId("selected-slot")).toHaveCount(3);
 
   // #when 作成を実行
@@ -37,41 +29,56 @@ test("create event via calendar mode with time presets", async ({ page }) => {
   const slug = shareUrl.split("/e/")[1];
   expect(slug).toBeTruthy();
 
-  // #then イベントページを開くと候補が3件表示される(回答フォーム側で確認)
+  // #then イベントページを開くと候補が3件表示される
   await page.goto(`/e/${slug}/answer`);
   await expect(page.getByTestId("answer-slot")).toHaveCount(3);
 });
 
+// 開始時刻を自由入力で編集でき、生成される候補ラベルに反映される(統合方式の中核)
+test("start time can be freely edited and reflects in the preview", async ({
+  page,
+}) => {
+  // #given /new を開いて当月の1日を選ぶ
+  await page.goto("/new?title=時刻編集テスト");
+  await selectCurrentMonthDays(page, [12]);
+
+  // #then 既定時刻19:00の候補が1件できている
+  await expect(page.getByTestId("selected-slot")).toContainText("19:00〜");
+
+  // #when 時刻入力を21:30に書き換える
+  await page.getByTestId("day-time-input").fill("21:30");
+
+  // #then 生成される候補ラベルが21:30に変わる
+  await expect(page.getByTestId("selected-slot")).toContainText("21:30〜");
+
+  // #when 終日をクイック追加する
+  await page.getByTestId("time-preset-allday").click();
+
+  // #then 時刻なしの「終日」候補が追加され、候補は2件になる
+  await expect(page.getByTestId("selected-slot")).toHaveCount(2);
+  await expect(page.getByTestId("selected-slot").nth(1)).toContainText("終日");
+});
+
 // 候補が上限(50件)を超えたら送信前にエラーで弾く(サーバー到達前のUXガード)
 test("rejects more than 50 slots before submitting", async ({ page }) => {
-  // #given /new を開く
+  // #given /new を開いて当月の1日を選ぶ(既定時刻で1件)
   await page.goto("/new?title=大量候補");
+  await selectCurrentMonthDays(page, [10]);
 
-  // #when 51 行の候補を入力して作成を押す
-  const lines = Array.from({ length: 51 }, (_, i) => `候補${i + 1}`).join("\n");
-  await page.getByTestId("slots-input").fill(lines);
+  // #when 「時間を追加」で候補を51件まで増やす
+  const addTime = page
+    .getByTestId("calendar-day")
+    .nth(0)
+    .getByTestId("add-time");
+  for (let i = 0; i < 50; i += 1) {
+    await addTime.click();
+  }
+  await expect(page.getByTestId("selected-slot")).toHaveCount(51);
+
+  // #when 作成を押す
   await page.getByTestId("create-submit").click();
 
   // #then 共有URLは発行されず、上限エラーが表示される
   await expect(page.getByTestId("new-event-error")).toContainText("最大50件");
   await expect(page.getByTestId("created-card")).toHaveCount(0);
-});
-
-// テキストモードとカレンダーモードを切り替えられ、テキストモードが既定であること
-test("mode toggle defaults to text and preserves slots-input", async ({
-  page,
-}) => {
-  // #given /new を開く
-  await page.goto("/new");
-
-  // #then 既定でテキスト入力(slots-input)が使える
-  await expect(page.getByTestId("slots-input")).toBeVisible();
-
-  // #when カレンダーに切替 → テキストへ戻す
-  await page.getByTestId("mode-calendar").click();
-  await expect(page.getByTestId("slots-input")).toHaveCount(0);
-  await page.getByTestId("mode-text").click();
-
-  // #then テキスト入力に戻っている
-  await expect(page.getByTestId("slots-input")).toBeVisible();
 });
