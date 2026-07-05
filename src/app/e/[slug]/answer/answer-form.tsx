@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { loadEditCredential, saveEditCredential } from "@/lib/local-storage";
 import { MARK_META } from "@/lib/marks";
 import type { Mark } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 import type { ExistingAnswerSet } from "./page";
 
 export interface SlotView {
@@ -25,6 +26,14 @@ export interface SlotView {
 }
 
 const DEFAULT_MARK: Mark = "maybe";
+
+// 出欠マークごとのアクティブ配色。○=参加(緑)/△=未定(琥珀)/×=不参加(薔薇)。
+const MARK_ACTIVE: Record<Mark, string> = {
+  yes: "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/25 hover:bg-emerald-500 hover:text-white",
+  maybe:
+    "border-amber-400 bg-amber-400 text-amber-950 shadow-sm shadow-amber-400/25 hover:bg-amber-400 hover:text-amber-950",
+  no: "border-rose-500 bg-rose-500 text-white shadow-sm shadow-rose-500/25 hover:bg-rose-500 hover:text-white",
+};
 
 function buildDefaultMarks(slots: SlotView[]): Record<string, Mark> {
   return Object.fromEntries(slots.map((slot) => [slot.id, DEFAULT_MARK]));
@@ -241,13 +250,16 @@ export function AnswerForm({
                     <Button
                       key={item.mark}
                       type="button"
-                      variant={active ? "default" : "outline"}
+                      variant="outline"
                       aria-pressed={active}
                       onClick={() => setMark(slot.id, item.mark)}
                       data-testid={`mark-${item.mark}`}
                       data-slot-id={slot.id}
                       data-active={active ? "true" : "false"}
-                      className="h-11 min-h-11 flex-1"
+                      className={cn(
+                        "h-11 min-h-11 flex-1 text-[0.95rem] font-semibold transition-all",
+                        active && MARK_ACTIVE[item.mark],
+                      )}
                     >
                       <span aria-hidden="true">{item.symbol}</span> {item.label}
                     </Button>
