@@ -12,7 +12,8 @@
       "!**/node_modules",
       "!**/pnpm-lock.yaml",
       "!**/drizzle",
-      "!public"
+      "!public",
+      "!promo"
     ]
   },
   "formatter": {
