@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { selectCurrentMonthDays } from "./helpers";
 
 // 作成 → 共有URLを開く → 回答 → 集計反映 の一気通貫フロー
 test("create event, answer, and see tally reflected", async ({ page }) => {
@@ -11,10 +12,8 @@ test("create event, answer, and see tally reflected", async ({ page }) => {
   await expect(page).toHaveURL(/\/new/);
   await expect(page.getByTestId("title-input")).toHaveValue("忘年会の日程");
 
-  // #when 候補日程を入力して作成
-  await page
-    .getByTestId("slots-input")
-    .fill("12/20(金) 19:00〜\n12/21(土) 18:00〜\n12/23(月) 19:00〜");
+  // #when カレンダーで3日を選んで作成(各日に既定時刻が付き候補3件)
+  await selectCurrentMonthDays(page, [10, 15, 20]);
   await page.getByTestId("create-submit").click();
 
   // #then 共有URLが発行される
@@ -54,7 +53,7 @@ test("create event, answer, and see tally reflected", async ({ page }) => {
 test("re-edit own answer from the same device", async ({ page }) => {
   // #given イベントを作成して回答済み
   await page.goto("/new?title=歓迎会");
-  await page.getByTestId("slots-input").fill("1/10\n1/11");
+  await selectCurrentMonthDays(page, [10, 11]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
   const slug = shareUrl.split("/e/")[1];

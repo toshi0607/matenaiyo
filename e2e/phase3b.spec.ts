@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { selectCurrentMonthDays } from "./helpers";
 
 // Phase 3b: OGP画像 / LINE共有 / 自動削除 cron の誤爆防止
 
@@ -8,7 +9,7 @@ async function createEvent(
   title: string,
 ): Promise<string> {
   await page.goto(`/new?title=${encodeURIComponent(title)}`);
-  await page.getByTestId("slots-input").fill("1/10\n1/11");
+  await selectCurrentMonthDays(page, [10, 11]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
   const slug = shareUrl.split("/e/")[1];
