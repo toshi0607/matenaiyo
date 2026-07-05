@@ -1,5 +1,6 @@
 "use client";
 
+import { sendGAEvent } from "@next/third-parties/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -130,6 +131,9 @@ export function AnswerForm({
         saveEditCredential(slug, {
           participantId: result.data.participantId,
           editToken: result.data.editToken,
+        });
+        sendGAEvent("event", "submit_answer", {
+          candidate_count: answers.length,
         });
       }
       setDone(true);

@@ -1,5 +1,6 @@
 "use client";
 
+import { sendGAEvent } from "@next/third-parties/google";
 import { ja } from "date-fns/locale/ja";
 import { Plus, Sun, X } from "lucide-react";
 import Link from "next/link";
@@ -240,6 +241,7 @@ export function NewEventForm() {
         setError(result.error);
         return;
       }
+      sendGAEvent("event", "create_event", { candidate_count: slots.length });
       saveAdminToken(result.data.slug, result.data.adminToken);
       const url = `${window.location.origin}/e/${result.data.slug}`;
       setCreated({ slug: result.data.slug, url });
