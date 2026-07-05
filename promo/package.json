@@ -7,7 +7,8 @@
     "bgm": "node scripts/make-bgm.mjs",
     "dev": "remotion studio",
     "render": "remotion render Promo out/matenaiyo-promo.mp4 --codec=h264",
-    "render:wide": "remotion render PromoWide out/matenaiyo-promo-wide.mp4 --codec=h264"
+    "render:wide": "remotion render PromoWide out/matenaiyo-promo-wide.mp4 --codec=h264",
+    "render:ogp": "remotion still OGP out/matenaiyo-ogp.png"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.400",

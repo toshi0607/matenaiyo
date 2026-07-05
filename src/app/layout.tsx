@@ -21,9 +21,29 @@ const zenKaku = Zen_Kaku_Gothic_New({
   display: "swap",
 });
 
+const siteName = "matenaiyo";
+const title = "matenaiyo — かんたん日程調整";
+const description = "ログイン不要・URLひとつで完結する日程調整サービス";
+
+// OGP/Twitter 画像は opengraph-image.png / twitter-image.png のファイル規約で自動付与される。
+// 絶対URL化のため metadataBase を本番ドメインに設定する。
 export const metadata: Metadata = {
-  title: "matenaiyo — かんたん日程調整",
-  description: "ログイン不要・URLひとつで完結する日程調整サービス",
+  metadataBase: new URL("https://matenaiyo.vercel.app"),
+  title,
+  description,
+  openGraph: {
+    type: "website",
+    siteName,
+    title,
+    description,
+    url: "/",
+    locale: "ja_JP",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
