@@ -32,6 +32,29 @@ export function cutoffDate(now: Date, months = DEFAULT_RETENTION_MONTHS): Date {
 }
 
 /**
+ * lastActivityAt から months ヶ月後の削除予定日時を返す。cutoffDate の逆方向の計算。
+ * 純粋関数(副作用なし)。
+ *
+ * UTC 基準で計算し、サーバーのタイムゾーンに依存しない。月末日は繰り上げず、
+ * 対象月の末日にクランプする(例: 8/31 の6ヶ月後 → 2/28、うるう年なら 2/29)。
+ */
+export function deletionDate(
+  lastActivityAt: Date,
+  months = DEFAULT_RETENTION_MONTHS,
+): Date {
+  const deletion = new Date(lastActivityAt.getTime());
+  const day = deletion.getUTCDate();
+  // 月シフト中のオーバーフロー(2/31 → 3/3 等)を避けるため一旦 1 日にする。
+  deletion.setUTCDate(1);
+  deletion.setUTCMonth(deletion.getUTCMonth() + months);
+  const lastDayOfMonth = new Date(
+    Date.UTC(deletion.getUTCFullYear(), deletion.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  deletion.setUTCDate(Math.min(day, lastDayOfMonth));
+  return deletion;
+}
+
+/**
  * cutoff より古い last_activity_at を持つイベントを削除し、削除件数を返す。
  */
 export async function deleteStaleEvents(

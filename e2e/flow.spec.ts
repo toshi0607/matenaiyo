@@ -25,6 +25,7 @@ test("create event, answer, and see tally reflected", async ({ page }) => {
   await page.getByTestId("go-to-event").click();
   await expect(page).toHaveURL(new RegExp(`/e/${slug}$`));
   await expect(page.getByTestId("empty-state")).toBeVisible();
+  await expect(page.getByTestId("retention-notice")).toBeVisible();
 
   // #when 回答フォームで1つ目を○、残りを×にして送信
   await page.getByTestId("answer-cta").click();
