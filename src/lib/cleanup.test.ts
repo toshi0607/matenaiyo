@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cutoffDate, DEFAULT_RETENTION_MONTHS } from "./cleanup";
+import { cutoffDate, DEFAULT_RETENTION_MONTHS, deletionDate } from "./cleanup";
 
 describe("cutoffDate", () => {
   it("defaults to 6 months before now", () => {
@@ -36,5 +36,27 @@ describe("cutoffDate", () => {
     const now = new Date("2026-08-31T00:00:00.000Z");
     const cutoff = cutoffDate(now, 6);
     expect(cutoff.toISOString()).toBe("2026-02-28T00:00:00.000Z");
+  });
+});
+
+describe("deletionDate", () => {
+  it("defaults to 6 months after lastActivityAt", () => {
+    const lastActivityAt = new Date("2026-01-05T12:00:00.000Z");
+    const deletion = deletionDate(lastActivityAt);
+    expect(deletion.toISOString()).toBe("2026-07-05T12:00:00.000Z");
+  });
+
+  it("clamps month-end overflow to the last day of the target month", () => {
+    // 8/31 の6ヶ月後は 2027年2月。2027年は平年なので 2/28 にクランプする。
+    const lastActivityAt = new Date("2026-08-31T00:00:00.000Z");
+    const deletion = deletionDate(lastActivityAt, 6);
+    expect(deletion.toISOString()).toBe("2027-02-28T00:00:00.000Z");
+  });
+
+  it("clamps to 2/29 in a leap year", () => {
+    // 8/31 の6ヶ月後は 2028年2月。2028年はうるう年なので 2/29 にクランプする。
+    const lastActivityAt = new Date("2027-08-31T00:00:00.000Z");
+    const deletion = deletionDate(lastActivityAt, 6);
+    expect(deletion.toISOString()).toBe("2028-02-29T00:00:00.000Z");
   });
 });

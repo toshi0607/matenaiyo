@@ -45,7 +45,7 @@ function getLimiter(rule: RateLimitRule): Ratelimit | null {
     limiter = new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(rule.limit, rule.window),
-      prefix: `chosei:ratelimit:${rule.name}`,
+      prefix: `matenaiyo:ratelimit:${rule.name}`,
       analytics: false,
     });
     limiters.set(rule.name, limiter);

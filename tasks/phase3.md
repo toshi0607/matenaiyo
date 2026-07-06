@@ -39,3 +39,12 @@ LINE共有のエンコード、Phase 1/2 不変条件維持も問題なし。
 
 - [x] **L3**: OGP画像を `revalidate = 300`(slug 単位 5分 ISR キャッシュ)に変更。繰り返しクロール時の
   DB クエリ + フォント fetch を抑制(回答数の反映は最大5分遅延で許容)。フォント fetch 失敗時の sans-serif フォールバックは維持。
+
+### 残項目の実装(2026-07-06)
+
+- [x] **削除予告表示**(DESIGN.md 非機能要件の残り): `deletionDate()` を `src/lib/cleanup.ts` に追加(cutoffDate の逆方向、
+  UTC 基準・月末クランプ、うるう年対応、ユニットテスト付き)。イベントページ最下部に
+  「最終更新から6ヶ月後(YYYY年M月D日頃)に自動削除されます」を表示(data-testid="retention-notice"、E2E で検証)。
+- [x] **内部識別子の chosei → matenaiyo リネーム**: レート制限の Redis prefix(`matenaiyo:ratelimit:`)と
+  Realtime チャンネル名。localStorage キー(`chosei:admin:` / `chosei:edit:`)は既存ユーザーのトークン参照が
+  切れるため意図的に据え置き。

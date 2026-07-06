@@ -32,8 +32,9 @@ reviewer subagent(新規コンテキスト)による Phase 2 レビュー: **承
 - [x] **M1(50件上限のクライアント側フィードバック)**: `new-event-form.tsx` に送信前ガードを追加。
   カレンダー/テキスト両モードで 50 件超なら「候補は最大50件までです(現在N件)」を表示。E2E も追加(text mode 51件)。
 
-### Phase 3 で対応(本番 Supabase 有効化時)
+### 対応済み(当初「Phase 3 で対応」とした項目、2026-07-06 実施)
 
-- **L1**: Realtime チャンネルがテーブル全体購読(全イベント固定名)。`filter: event_id=eq.<id>` で当該イベントに限定すると
-  無関係な `router.refresh()` を減らせる。表示は常に正しい(サーバーが真実の源)ので実害は本番のみ。
-- **L2**: `@supabase/supabase-js` の import 失敗時のポーリング退避が無言。運用のためログ1行あると安心。
+- [x] **L1**: Realtime 購読を当該イベントに限定。全書き込み Action が同一トランザクションで
+  `events.last_activity_at` を更新するため、`events` テーブル1本を `filter: id=eq.<eventId>` で購読する方式に変更
+  (answers に event_id 列が無いため、3テーブル購読より正確かつ簡潔)。チャンネル名は `matenaiyo-tally-<eventId>`。
+- [x] **L2**: `@supabase/supabase-js` の import 失敗時に `console.warn` 1行(エラー内容付き)を出してからポーリングに退避。
