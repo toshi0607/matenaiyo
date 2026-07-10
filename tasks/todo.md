@@ -1,3 +1,28 @@
+# Lighthouse 計測と改善(完了、2026-07-10)
+
+計測(本番・改善前): モバイル Perf 62 / LCP 30.2s、デスクトップ 75 / 5.2s、A11y 96。
+原因: 日本語 Web フォント 384ファイル/5.1MB(ページ総量の92%)+ primary のコントラスト不足。
+
+対応(ユーザー承認済み、PR #16・#17):
+- 本文をシステムフォント化(Zen Kaku 除去、見出しの Zen Maru は維持)
+- Zen Maru の preload: false(next/font が日本語フォントの全120スライスを強制 preload していた)
+- primary を oklch(0.55 0.17 38) に暗め調整 + ヒーローバッジ背景を bg-primary/5 に(WCAG AA 達成)
+
+結果(本番・改善後):
+| | モバイル | デスクトップ |
+|---|---|---|
+| Performance | 62 → **69** | 75 → **99** |
+| LCP | 30.2s → **5.2s** | 5.2s → **0.8s** |
+| Accessibility | 96 → **100** | 96 → **100** |
+| ページ総量 | 5,546 → **556 KiB** | 同 |
+| フォント | 384files/5.1MB → **12files/150KiB** | 同 |
+
+残る差分(モバイル 69→90 の壁)と判断:
+- render-blocking CSS 46KiB(Tailwind チャンク、Next の枠組み上インライン化困難)/ gtag 161KiB(計測に必要)/ h1 の animate-rise 演出分の描画遅延
+- いずれも費用対効果が低くブランド・計測とのトレードオフのため、ここで打ち止め。実ユーザー計測(Search Console の Core Web Vitals)で監視に移行
+
+---
+
 # SEO フェーズ2: バイラルループ + トップ LP 化(完了)
 
 戦略は [reach-strategy.md](reach-strategy.md) の柱2・柱4。
