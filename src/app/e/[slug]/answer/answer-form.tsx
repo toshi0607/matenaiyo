@@ -10,6 +10,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -183,6 +184,25 @@ export function AnswerForm({
             続けて編集する
           </Button>
         </CardContent>
+        <CardFooter
+          className="flex flex-col items-start gap-2 text-sm"
+          data-testid="create-own-cta"
+        >
+          <p className="text-muted-foreground">
+            matenaiyo はログイン不要・無料で使えます
+          </p>
+          <Link
+            href="/"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={() =>
+              sendGAEvent("event", "create_own_click", {
+                source: "answer_done",
+              })
+            }
+          >
+            自分も日程調整をつくる →
+          </Link>
+        </CardFooter>
       </Card>
     );
   }
