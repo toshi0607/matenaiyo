@@ -72,7 +72,7 @@ export default function Home() {
       <JsonLd data={faqJsonLd} />
       <div className="w-full max-w-xl space-y-9">
         <div className="space-y-4 text-center">
-          <span className="animate-rise inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-medium text-primary">
+          <span className="animate-rise inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1.5 text-xs font-medium text-primary">
             <span aria-hidden="true">🍊</span>
             ログイン不要・URLひとつで完結
           </span>

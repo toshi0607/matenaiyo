@@ -13,6 +13,9 @@ const zenMaru = Zen_Maru_Gothic({
   weight: ["500", "700"],
   subsets: ["latin"],
   display: "swap",
+  // 日本語フォントは subset 指定できず全スライスが preload されるため無効化する。
+  // 実際に描画するグリフのスライスだけが CSS の unicode-range 経由でロードされる。
+  preload: false,
 });
 
 // OGP/Twitter 画像は opengraph-image.png / twitter-image.png のファイル規約で自動付与される。
