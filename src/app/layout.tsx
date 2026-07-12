@@ -1,8 +1,10 @@
 import { GoogleAnalytics } from "@next/third-parties/google";
 import type { Metadata } from "next";
-import { Zen_Kaku_Gothic_New, Zen_Maru_Gothic } from "next/font/google";
+import { Zen_Maru_Gothic } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 // 見出し用の丸ゴシック。「待てないよ」の親しみやすさを担う。
@@ -11,38 +13,32 @@ const zenMaru = Zen_Maru_Gothic({
   weight: ["500", "700"],
   subsets: ["latin"],
   display: "swap",
+  // 日本語フォントは subset 指定できず全スライスが preload されるため無効化する。
+  // 実際に描画するグリフのスライスだけが CSS の unicode-range 経由でロードされる。
+  preload: false,
 });
-
-// 本文用の可読性の高いゴシック。
-const zenKaku = Zen_Kaku_Gothic_New({
-  variable: "--font-zen-kaku",
-  weight: ["400", "500", "700"],
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const siteName = "matenaiyo";
-const title = "matenaiyo — かんたん日程調整";
-const description = "ログイン不要・URLひとつで完結する日程調整サービス";
 
 // OGP/Twitter 画像は opengraph-image.png / twitter-image.png のファイル規約で自動付与される。
 // 絶対URL化のため metadataBase を本番ドメインに設定する。
 export const metadata: Metadata = {
-  metadataBase: new URL("https://matenaiyo.vercel.app"),
-  title,
-  description,
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   openGraph: {
     type: "website",
-    siteName,
-    title,
-    description,
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     url: "/",
     locale: "ja_JP",
   },
   twitter: {
     card: "summary_large_image",
-    title,
-    description,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  verification: {
+    google: "vwKho_fXf_PTz2Iocs5Sa_lZHI5dYDPuNIxDnp8XqVU",
   },
 };
 
@@ -56,7 +52,7 @@ export default function RootLayout({
     <html
       lang="ja"
       suppressHydrationWarning
-      className={`${zenMaru.variable} ${zenKaku.variable} h-full antialiased`}
+      className={`${zenMaru.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider
@@ -67,6 +63,7 @@ export default function RootLayout({
         >
           <SiteHeader />
           {children}
+          <SiteFooter />
         </ThemeProvider>
       </body>
       {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
