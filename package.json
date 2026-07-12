@@ -16,7 +16,7 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@next/third-parties": "16.2.10",
-    "@supabase/supabase-js": "^2.110.0",
+    "@supabase/supabase-js": "^2.110.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",
@@ -37,7 +37,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
+    "@biomejs/biome": "^2.5.3",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^26",
@@ -46,6 +46,6 @@
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4",
     "typescript": "^6",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
