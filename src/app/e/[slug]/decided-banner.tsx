@@ -45,15 +45,17 @@ export function DecidedBanner({
     URL.revokeObjectURL(url);
   }
 
+  // 色は「幹事が決めたこと = primary(コーラル)/ 集計の事実(○参加・ベスト)= emerald」
+  // の使い分けに従う。幹事管理の「確定中」バッジと同色。
   return (
     <Card
-      className="border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
+      className="border-primary/40 bg-primary/10"
       data-testid="decided-banner"
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span
-            className="rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+            className="rounded bg-primary px-1.5 py-0.5 text-xs font-semibold text-primary-foreground"
             aria-hidden="true"
           >
             確定

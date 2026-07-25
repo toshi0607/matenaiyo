@@ -90,7 +90,7 @@ answers
 | `/new` | 作成ウィザード: ①タイトル・メモ → ②カレンダーで候補日選択 + 時刻 → ③URL発行・コピー・LINE共有 |
 | `/e/[slug]` | イベントページ。RSCで集計表を描画し、client component が Realtime 購読 |
 | `/e/[slug]/answer` | 回答フォーム。モバイルは候補日を1枚ずつカードで表示し ○/△/× をタップ |
-| `/e/[slug]/admin` | 幹事管理(admin_token 保持時のみ)。締切・日程確定・イベント編集・行削除 |
+| `/e/[slug]/admin` | 幹事管理(admin_token 保持時のみ)。締切・日程確定・候補日程の追加/削除・行削除 |
 
 UI詳細:
 - 集計表: 行=候補日、列=参加者。先頭列 sticky で横スクロール。○最多の行を success 系トーンでハイライトし「ベスト」バッジ
@@ -104,6 +104,9 @@ UI詳細:
 - `submitAnswer(slug, input)` → `{ participantId, editToken }`
 - `updateAnswer(slug, participantId, editToken, input)`
 - `closeEvent / decideSlot / deleteParticipant`(admin_token 必須)
+- `addSlots / deleteSlot`(admin_token 必須)— 幹事による候補日程の追加・削除。
+  追加は既存候補と重複しないものだけを末尾(sort_order = 最大 + 1)に足し、合計 50 件を上限とする。
+  削除は候補が1件のときは拒否し、確定中の候補なら decided_slot を解除する(回答は answers の CASCADE で消える)
 
 書き込み後は Supabase Realtime の postgres_changes が全クライアントに届き、
 購読側は `router.refresh()` で RSC を再取得(クライアント側で差分マージせず、

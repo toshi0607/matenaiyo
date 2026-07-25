@@ -3,7 +3,7 @@
 import { sendGAEvent } from "@next/third-parties/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { submitAnswer, updateAnswer } from "@/app/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -30,14 +30,19 @@ export interface SlotView {
 const DEFAULT_MARK: Mark = "maybe";
 
 // 出欠マークごとのアクティブ配色。○=参加(緑)/△=未定(琥珀)/×=不参加(薔薇)。
+// dark: も明示する: outline バリアントの dark:bg-input/30 は tailwind-merge では
+// bg-* と衝突扱いされず、暗所で選択色が消えてしまう(△ は暗い文字色だけが残る)。
 const MARK_ACTIVE: Record<Mark, string> = {
-  yes: "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/25 hover:bg-emerald-500 hover:text-white",
+  yes: "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/25 hover:bg-emerald-500 hover:text-white dark:border-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-500",
   maybe:
-    "border-amber-400 bg-amber-400 text-amber-950 shadow-sm shadow-amber-400/25 hover:bg-amber-400 hover:text-amber-950",
-  no: "border-rose-500 bg-rose-500 text-white shadow-sm shadow-rose-500/25 hover:bg-rose-500 hover:text-white",
+    "border-amber-400 bg-amber-400 text-amber-950 shadow-sm shadow-amber-400/25 hover:bg-amber-400 hover:text-amber-950 dark:border-amber-400 dark:bg-amber-400 dark:hover:bg-amber-400",
+  no: "border-rose-500 bg-rose-500 text-white shadow-sm shadow-rose-500/25 hover:bg-rose-500 hover:text-white dark:border-rose-500 dark:bg-rose-500 dark:hover:bg-rose-500",
 };
 
-function buildDefaultMarks(slots: SlotView[]): Record<string, Mark> {
+/** slotId -> 出欠。未選択(再編集時にまだ答えていない候補)は undefined。 */
+type MarkSelection = Record<string, Mark | undefined>;
+
+function buildDefaultMarks(slots: SlotView[]): MarkSelection {
   return Object.fromEntries(slots.map((slot) => [slot.id, DEFAULT_MARK]));
 }
 
@@ -55,9 +60,10 @@ export function AnswerForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [comment, setComment] = useState("");
-  const [marks, setMarks] = useState<Record<string, Mark>>(() =>
-    buildDefaultMarks(slots),
-  );
+  // 初期値は空。既存回答の有無が分かってから既定値か既存回答を入れる
+  // (先に既定値を描くと、再編集時に未回答の候補が一瞬「未定」に見える)。
+  const [marks, setMarks] = useState<MarkSelection>({});
+  const defaultsApplied = useRef(false);
   const [editCredential, setEditCredential] = useState<{
     participantId: string;
     editToken: string;
@@ -66,29 +72,44 @@ export function AnswerForm({
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // 既存回答があれば初期表示（再編集導線）
+  // 既存回答があれば初期表示（再編集導線）。無ければ全候補に既定値を入れる。
   useEffect(() => {
     const credential = loadEditCredential(slug);
-    if (!credential) return;
-    const mine = existing.find(
-      (item) => item.participantId === credential.participantId,
-    );
-    if (!mine) return;
-    setEditCredential(credential);
-    setName(mine.name);
-    setComment(mine.comment);
-    setMarks((prev) => {
-      const next = { ...prev };
-      for (const slot of slots) {
-        next[slot.id] = mine.marks[slot.id] ?? DEFAULT_MARK;
-      }
-      return next;
-    });
+    const mine = credential
+      ? existing.find((item) => item.participantId === credential.participantId)
+      : undefined;
+
+    if (credential && mine) {
+      setEditCredential(credential);
+      setName(mine.name);
+      setComment(mine.comment);
+      // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
+      // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
+      setMarks(() => {
+        const next: MarkSelection = {};
+        for (const slot of slots) {
+          next[slot.id] = mine.marks[slot.id];
+        }
+        return next;
+      });
+      return;
+    }
+
+    // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
+    if (!defaultsApplied.current) {
+      defaultsApplied.current = true;
+      setMarks(buildDefaultMarks(slots));
+    }
   }, [slug, existing, slots]);
 
   function setMark(slotId: string, mark: Mark) {
     setMarks((prev) => ({ ...prev, [slotId]: mark }));
   }
+
+  // 再編集時、自分が回答したあとに追加された候補の数。
+  const newSlotCount = editCredential
+    ? slots.filter((slot) => marks[slot.id] === undefined).length
+    : 0;
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,10 +120,16 @@ export function AnswerForm({
       return;
     }
 
-    const answers = slots.map((slot) => ({
-      slotId: slot.id,
-      mark: marks[slot.id] ?? DEFAULT_MARK,
-    }));
+    // 未選択の候補は送らない。集計表では「未回答」として表示される。
+    const answers = slots.flatMap((slot) => {
+      const mark = marks[slot.id];
+      return mark ? [{ slotId: slot.id, mark }] : [];
+    });
+
+    if (answers.length === 0) {
+      setError("1つ以上の候補に回答してください");
+      return;
+    }
 
     startTransition(async () => {
       if (editCredential) {
@@ -219,6 +246,9 @@ export function AnswerForm({
           data-testid="editing-notice"
         >
           あなたの既存の回答を編集しています。
+          {newSlotCount > 0
+            ? `あとから追加された候補が${newSlotCount}件あります。`
+            : null}
         </p>
       ) : null}
 
@@ -262,14 +292,24 @@ export function AnswerForm({
         {slots.map((slot) => (
           <Card key={slot.id} data-testid="answer-slot">
             <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <span className="font-medium">{slot.label}</span>
+              <span className="flex flex-wrap items-center gap-2 font-medium">
+                {slot.label}
+                {editCredential && marks[slot.id] === undefined ? (
+                  <span
+                    className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground text-xs font-semibold"
+                    data-testid="new-slot-badge"
+                  >
+                    新しい候補
+                  </span>
+                ) : null}
+              </span>
               <div
                 className="grid grid-cols-3 gap-2 sm:flex"
                 role="radiogroup"
                 aria-label={`${slot.label} の出欠`}
               >
                 {MARK_META.map((item) => {
-                  const active = (marks[slot.id] ?? DEFAULT_MARK) === item.mark;
+                  const active = marks[slot.id] === item.mark;
                   return (
                     <Button
                       key={item.mark}
