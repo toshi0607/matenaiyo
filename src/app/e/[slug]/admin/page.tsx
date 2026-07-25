@@ -51,12 +51,17 @@ export default async function AdminPage({
 
   const slots: AdminSlot[] = orderedSlots.map((slot) => {
     const tally = tallyBySlot.get(slot.id);
+    const yes = tally?.yes ?? 0;
+    const maybe = tally?.maybe ?? 0;
+    const no = tally?.no ?? 0;
     return {
       id: slot.id,
       label: slotLabel(slot),
-      yes: tally?.yes ?? 0,
-      maybe: tally?.maybe ?? 0,
-      no: tally?.no ?? 0,
+      yes,
+      maybe,
+      no,
+      // あとから追加した候補は回答者がいても回答が付かないため、未回答数を明示する。
+      unanswered: event.participants.length - (yes + maybe + no),
       isBest: tally?.isBest ?? false,
     };
   });

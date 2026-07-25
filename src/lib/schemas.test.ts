@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  addSlotsSchema,
   closeEventSchema,
   createEventSchema,
   decideSlotSchema,
   deleteParticipantSchema,
+  deleteSlotSchema,
+  MAX_SLOTS_PER_EVENT,
   markSchema,
   slotInputSchema,
   slugSchema,
@@ -221,5 +224,62 @@ describe("admin action schemas", () => {
       deleteParticipantSchema.safeParse({ slug: SLUG, adminToken: "tok" })
         .success,
     ).toBe(false);
+  });
+
+  it("deleteSlotSchema requires a uuid slotId", () => {
+    expect(
+      deleteSlotSchema.safeParse({
+        slug: SLUG,
+        adminToken: "tok",
+        slotId: UUID,
+      }).success,
+    ).toBe(true);
+    expect(
+      deleteSlotSchema.safeParse({ slug: SLUG, adminToken: "tok", slotId: "x" })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("addSlotsSchema", () => {
+  const valid = {
+    slug: SLUG,
+    adminToken: "tok",
+    slots: [{ startsAt: "2026-07-10T19:00:00+09:00" }, { label: "7/11 終日" }],
+  };
+
+  it("accepts dated and label-only slots", () => {
+    // #given 日時付きと label のみの候補が混在する入力
+    // #when / #then パースが成功する
+    expect(addSlotsSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects an empty slot list", () => {
+    // #given 追加する候補が 0 件
+    expect(addSlotsSchema.safeParse({ ...valid, slots: [] }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects more than the per-event maximum", () => {
+    // #given 上限を 1 件超える候補
+    const slots = Array.from({ length: MAX_SLOTS_PER_EVENT + 1 }, (_, i) => ({
+      label: `slot-${i}`,
+    }));
+    expect(addSlotsSchema.safeParse({ ...valid, slots }).success).toBe(false);
+  });
+
+  it("rejects a missing adminToken", () => {
+    // #given adminToken が空
+    expect(addSlotsSchema.safeParse({ ...valid, adminToken: "" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects a slot with neither startsAt nor label", () => {
+    // #given 日時も label も無い候補
+    expect(addSlotsSchema.safeParse({ ...valid, slots: [{}] }).success).toBe(
+      false,
+    );
   });
 });

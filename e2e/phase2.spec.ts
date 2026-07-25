@@ -25,6 +25,35 @@ test("theme toggle switches to dark mode", async ({ page }) => {
   await expect(html).toHaveClass(/dark/);
 });
 
+// ダークモードでも回答フォームの選択色(○△×)が塗りとして残ることを守る。
+// outline バリアントの dark:bg-input/30 に負けて選択が見えなくなる退行を防ぐ。
+test("selected marks keep their fill color in dark mode", async ({ page }) => {
+  // #given ダークモードで候補1件のイベントを作る
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/new?title=ダーク選択色");
+  await selectCurrentMonthDays(page, [10]);
+  await page.getByTestId("create-submit").click();
+  const shareUrl = await page.getByTestId("share-url").inputValue();
+  const slug = shareUrl.split("/e/")[1];
+
+  // #when 回答フォームで △未定 を選ぶ
+  await page.goto(`/e/${slug}/answer`);
+  const maybe = page
+    .getByTestId("answer-slot")
+    .nth(0)
+    .getByTestId("mark-maybe");
+  await maybe.click();
+  await expect(maybe).toHaveAttribute("data-active", "true");
+
+  // #then 選択ボタンの背景は透けた白ではなく琥珀色のまま
+  // (transition-all の途中を拾わないよう、確定した色になるまで待つ)
+  await expect
+    .poll(() =>
+      maybe.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .toMatch(/lab\(80/);
+});
+
 // 自動更新(ポーリング経路): 別コンテキストの回答が集計ページに自動反映される
 test("tally auto-refreshes when another user answers", async ({
   page,
