@@ -4,13 +4,14 @@ import { sendGAEvent } from "@next/third-parties/google";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   addSlots,
   closeEvent,
   decideSlot,
   deleteParticipant,
   deleteSlot,
+  getAdminParticipants,
 } from "@/app/actions";
 import { SlotPicker, useSlotPicker } from "@/components/slot-picker";
 import { Button } from "@/components/ui/button";
@@ -22,23 +23,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { loadAdminToken } from "@/lib/local-storage";
-import { MAX_SLOTS_PER_EVENT } from "@/lib/schemas";
+import { MAX_SLOTS_PER_EVENT, type Mark } from "@/lib/schemas";
+import { tallySlots } from "@/lib/tally";
 import { cn } from "@/lib/utils";
 
 export interface AdminSlot {
   id: string;
   label: string;
-  yes: number;
-  maybe: number;
-  no: number;
-  unanswered: number;
-  isBest: boolean;
 }
 
 export interface AdminParticipant {
   id: string;
   name: string;
   comment: string;
+  marks: Record<string, Mark>;
 }
 
 // 残り枠は上限が近いときだけ知らせる(遠い数字は行動を変えないため)。
@@ -62,16 +60,15 @@ export function AdminPanel({
   closed,
   decidedSlotId,
   slots,
-  participants,
 }: {
   slug: string;
   closed: boolean;
   decidedSlotId: string | null;
   slots: AdminSlot[];
-  participants: AdminParticipant[];
 }) {
   const router = useRouter();
   const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<AdminParticipant[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<AdminError | null>(null);
   // 実行中の操作の種類。進行中コピーを実際に押した操作にだけ出すために持つ。
@@ -82,10 +79,28 @@ export function AdminPanel({
   // 削除は取り消せないため、行ごとに一度だけ確認を挟む。キーは "slot:id" / "participant:id"。
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
 
+  const refreshParticipants = useCallback(
+    async (token: string) => {
+      const result = await getAdminParticipants({ slug, adminToken: token });
+      if (!result.ok) {
+        setError({ scope: "global", message: result.error });
+        return;
+      }
+      setParticipants(result.data);
+    },
+    [slug],
+  );
+
   useEffect(() => {
-    setAdminToken(loadAdminToken(slug));
+    const token = loadAdminToken(slug);
+    setAdminToken(token);
     setReady(true);
-  }, [slug]);
+    if (token) {
+      startTransition(async () => {
+        await refreshParticipants(token);
+      });
+    }
+  }, [slug, refreshParticipants]);
 
   function run(
     action: () => Promise<{ ok: boolean; error?: string }>,
@@ -104,6 +119,9 @@ export function AdminPanel({
         return;
       }
       onSuccess?.();
+      if (adminToken) {
+        await refreshParticipants(adminToken);
+      }
       router.refresh();
     });
   }
@@ -129,6 +147,31 @@ export function AdminPanel({
   const selectedCount = picker.slotInputs.length;
   const isOnlySlot = slots.length <= 1;
   const hasAnswers = participants.length > 0;
+  const tallyBySlot = new Map(
+    tallySlots(
+      slots.map((slot) => slot.id),
+      participants.flatMap((participant) =>
+        Object.entries(participant.marks).map(([slotId, mark]) => ({
+          slotId,
+          mark,
+        })),
+      ),
+    ).map((tally) => [tally.slotId, tally]),
+  );
+  const slotsWithTallies = slots.map((slot) => {
+    const tally = tallyBySlot.get(slot.id);
+    const yes = tally?.yes ?? 0;
+    const maybe = tally?.maybe ?? 0;
+    const no = tally?.no ?? 0;
+    return {
+      ...slot,
+      yes,
+      maybe,
+      no,
+      unanswered: participants.length - (yes + maybe + no),
+      isBest: tally?.isBest ?? false,
+    };
+  });
 
   function handleAddSlots() {
     if (selectedCount === 0) {
@@ -189,7 +232,7 @@ export function AdminPanel({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {slots.map((slot) => {
+          {slotsWithTallies.map((slot) => {
             const isDecided = slot.id === decidedSlotId;
             const confirmKey = `slot:${slot.id}`;
             return (

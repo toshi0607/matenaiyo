@@ -4,7 +4,7 @@ import { sendGAEvent } from "@next/third-parties/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { submitAnswer, updateAnswer } from "@/app/actions";
+import { getOwnAnswer, submitAnswer, updateAnswer } from "@/app/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -20,7 +20,6 @@ import { loadEditCredential, saveEditCredential } from "@/lib/local-storage";
 import { MARK_META } from "@/lib/marks";
 import type { Mark } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
-import type { ExistingAnswerSet } from "./page";
 
 export interface SlotView {
   id: string;
@@ -50,12 +49,10 @@ export function AnswerForm({
   slug,
   slots,
   closed,
-  existing,
 }: {
   slug: string;
   slots: SlotView[];
   closed: boolean;
-  existing: ExistingAnswerSet[];
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -70,37 +67,49 @@ export function AnswerForm({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [loadingOwnAnswer, setLoadingOwnAnswer] = useState(true);
   const [pending, startTransition] = useTransition();
 
-  // 既存回答があれば初期表示（再編集導線）。無ければ全候補に既定値を入れる。
+  // localStorage の編集能力を使って、既存の自分の回答だけを読み込む。
   useEffect(() => {
     const credential = loadEditCredential(slug);
-    const mine = credential
-      ? existing.find((item) => item.participantId === credential.participantId)
-      : undefined;
+    if (!credential) {
+      // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
+      if (!defaultsApplied.current) {
+        defaultsApplied.current = true;
+        setMarks(buildDefaultMarks(slots));
+      }
+      setLoadingOwnAnswer(false);
+      return;
+    }
+    let cancelled = false;
 
-    if (credential && mine) {
+    startTransition(async () => {
+      const result = await getOwnAnswer({ slug, ...credential });
+      if (cancelled) return;
+      setLoadingOwnAnswer(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setEditCredential(credential);
-      setName(mine.name);
-      setComment(mine.comment);
+      setName(result.data.name);
+      setComment(result.data.comment);
       // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
       // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
       setMarks(() => {
         const next: MarkSelection = {};
         for (const slot of slots) {
-          next[slot.id] = mine.marks[slot.id];
+          next[slot.id] = result.data.marks[slot.id];
         }
         return next;
       });
-      return;
-    }
+    });
 
-    // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
-    if (!defaultsApplied.current) {
-      defaultsApplied.current = true;
-      setMarks(buildDefaultMarks(slots));
-    }
-  }, [slug, existing, slots]);
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, slots]);
 
   function setMark(slotId: string, mark: Mark) {
     setMarks((prev) => ({ ...prev, [slotId]: mark }));
@@ -349,14 +358,16 @@ export function AnswerForm({
         <Button
           type="submit"
           className="h-11 min-h-11 flex-1"
-          disabled={pending}
+          disabled={pending || loadingOwnAnswer}
           data-testid="answer-submit"
         >
-          {pending
-            ? "送信中…"
-            : editCredential
-              ? "回答を更新する"
-              : "回答を送信する"}
+          {loadingOwnAnswer
+            ? "回答を読み込み中…"
+            : pending
+              ? "送信中…"
+              : editCredential
+                ? "回答を更新する"
+                : "回答を送信する"}
         </Button>
         <Link
           href={`/e/${slug}`}

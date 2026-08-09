@@ -348,3 +348,27 @@ reviewer subagent(新規コンテキスト)による Phase 1 レビュー: **承
 - `pnpm test` 46 tests passed, exit 0
 - `pnpm build` exit 0(`/` Static、`/new`・`/e/[slug]`・`/e/[slug]/answer` Dynamic)
 - Playwright E2E 3 passed(作成→共有URL→回答→集計反映 + 再編集)を docker Postgres の実 DB で検証
+
+## Codex Security 指摘修正（2026-08-09）
+
+- [x] 回答・管理画面のコメント漏えいを再現する回帰テストを追加する
+- [x] edit/admin token をサーバー側で検証した専用 read Action にコメント取得を限定する
+- [x] ブラウザから Supabase public table へ直接接続する Realtime 経路を廃止し、既存ポーリングへ統一する
+- [x] 本番で Upstash 設定が欠ける場合は public write を fail-closed にし、ローカル/CI の従来挙動を維持する
+- [x] focused tests・`pnpm check`・`pnpm test`・`pnpm build`・可能なら E2E で検証する
+- [x] 独立 reviewer で認可境界、回帰、テスト不足を確認する
+
+### 設計判断
+
+- 共有 slug は公開閲覧用であり、参加者コメントの認可には使わない。localStorage の capability token を専用 Server Action に渡し、検証成功後に必要最小限のレコードだけ返す。
+- Supabase の event-scoped RLS/JWT を新設するより、既にサポート済みの5秒ポーリングへ統一する方が、ログイン不要モデルを維持したままブラウザとDBの直接境界を完全に閉じる最小変更になる。
+- レート制限は `NODE_ENV=production` の設定欠落だけ拒否し、ローカル開発とCIでは Upstash なしを許容する。
+
+### レビュー結果
+
+- コメント漏えいは修正前 E2E で未認可 `/answer` の RSC ペイロードに sentinel が含まれることを再現。修正後は未認可 `/answer`・`/admin` から消え、正しい edit/admin token では必要なコメントだけ取得できる。
+- Supabase のブラウザ直結コード・公開環境変数・依存を削除し、非表示タブ停止と cleanup を維持した5秒ポーリングへ統一した。
+- production で Upstash URL/Token のどちらかが欠ける3ケースを回帰テスト化し、fail-closed と非 production の従来挙動を確認した。
+- 最新 `origin/main` へのリベース後に、`git diff --check`、Supabase 境界の残存検索、`pnpm check`、`pnpm test`（85 tests）、`pnpm build`、focused E2E、全 E2E（17 tests）がすべて成功した。
+- 独立 reviewer は認可・回帰・競合を再確認し、actionable finding なしで承認した。
+- 残存前提: localStorage token は端末内 bearer capability。誤/クロスイベント token、実 Upstash、非表示タブの専用テストは将来の追加余地として残る。

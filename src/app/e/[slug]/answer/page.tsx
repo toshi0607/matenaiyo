@@ -2,18 +2,10 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { events } from "@/db/schema";
-import type { Mark } from "@/lib/schemas";
 import { slotLabel } from "@/lib/slot-label";
 import { AnswerForm, type SlotView } from "./answer-form";
 
 export const dynamic = "force-dynamic";
-
-export interface ExistingAnswerSet {
-  participantId: string;
-  name: string;
-  comment: string;
-  marks: Record<string, Mark>;
-}
 
 export default async function AnswerPage({
   params,
@@ -26,7 +18,6 @@ export default async function AnswerPage({
     where: eq(events.slug, slug),
     with: {
       slots: true,
-      participants: { with: { answers: true } },
     },
   });
 
@@ -37,17 +28,6 @@ export default async function AnswerPage({
   const slots: SlotView[] = [...event.slots]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((slot) => ({ id: slot.id, label: slotLabel(slot) }));
-
-  const existing: ExistingAnswerSet[] = event.participants.map(
-    (participant) => ({
-      participantId: participant.id,
-      name: participant.name,
-      comment: participant.comment,
-      marks: Object.fromEntries(
-        participant.answers.map((answer) => [answer.slotId, answer.mark]),
-      ),
-    }),
-  );
 
   return (
     <main className="flex flex-1 flex-col items-center bg-background px-4 py-10">
@@ -60,7 +40,6 @@ export default async function AnswerPage({
           slug={slug}
           slots={slots}
           closed={event.status === "closed"}
-          existing={existing}
         />
       </div>
     </main>

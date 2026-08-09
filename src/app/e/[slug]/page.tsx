@@ -85,7 +85,7 @@ export default async function EventPage({
 
   return (
     <main className="flex flex-1 flex-col items-center bg-background px-4 py-10">
-      <LiveRefresh eventId={event.id} />
+      <LiveRefresh />
       <div className="w-full max-w-4xl space-y-6">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">{event.title}</h1>
