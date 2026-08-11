@@ -32,7 +32,7 @@ export const events = pgTable("events", {
   lastActivityAt: timestamp("last_activity_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const slots = pgTable("slots", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -42,7 +42,7 @@ export const slots = pgTable("slots", {
   startsAt: timestamp("starts_at", { withTimezone: true }),
   label: text("label"),
   sortOrder: integer("sort_order").notNull(),
-});
+}).enableRLS();
 
 export const participants = pgTable("participants", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -58,7 +58,7 @@ export const participants = pgTable("participants", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const answers = pgTable(
   "answers",
@@ -72,7 +72,7 @@ export const answers = pgTable(
     mark: answerMark("mark").notNull(),
   },
   (table) => [primaryKey({ columns: [table.participantId, table.slotId] })],
-);
+).enableRLS();
 
 export const eventsRelations = relations(events, ({ one, many }) => ({
   slots: many(slots, { relationName: "eventSlots" }),

@@ -6,6 +6,7 @@ import {
   decideSlotSchema,
   deleteParticipantSchema,
   deleteSlotSchema,
+  MAX_PARTICIPANTS_PER_EVENT,
   MAX_SLOTS_PER_EVENT,
   markSchema,
   slotInputSchema,
@@ -26,6 +27,12 @@ describe("slugSchema", () => {
   it("rejects wrong length or invalid chars", () => {
     expect(slugSchema.safeParse("short").success).toBe(false);
     expect(slugSchema.safeParse(`${SLUG.slice(0, 20)}!`).success).toBe(false);
+  });
+});
+
+describe("event limits", () => {
+  it("sets the participant capacity to 100", () => {
+    expect(MAX_PARTICIPANTS_PER_EVENT).toBe(100);
   });
 });
 

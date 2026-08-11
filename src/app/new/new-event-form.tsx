@@ -1,9 +1,6 @@
 "use client";
 
-import { sendGAEvent } from "@next/third-parties/google";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createEvent } from "@/app/actions";
 import { SlotPicker, useSlotPicker } from "@/components/slot-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -16,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { saveAdminToken } from "@/lib/local-storage";
+import { consumeEventTitleDraft, saveAdminToken } from "@/lib/local-storage";
 import { MAX_SLOTS_PER_EVENT } from "@/lib/schemas";
 
 interface CreatedEvent {
@@ -25,14 +22,18 @@ interface CreatedEvent {
 }
 
 export function NewEventForm() {
-  const searchParams = useSearchParams();
-  const [title, setTitle] = useState(searchParams.get("title") ?? "");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const picker = useSlotPicker();
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedEvent | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const draft = consumeEventTitleDraft();
+    if (draft) setTitle(draft);
+  }, []);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +68,6 @@ export function NewEventForm() {
         setError(result.error);
         return;
       }
-      sendGAEvent("event", "create_event", { candidate_count: slots.length });
       saveAdminToken(result.data.slug, result.data.adminToken);
       const url = `${window.location.origin}/e/${result.data.slug}`;
       setCreated({ slug: result.data.slug, url });
@@ -112,13 +112,13 @@ export function NewEventForm() {
               {copied ? "コピーしました" : "URLをコピー"}
             </Button>
           </div>
-          <Link
+          <a
             href={`/e/${created.slug}`}
             className={buttonVariants({ className: "w-full" })}
             data-testid="go-to-event"
           >
             イベントページを開く
-          </Link>
+          </a>
         </CardContent>
       </Card>
     );

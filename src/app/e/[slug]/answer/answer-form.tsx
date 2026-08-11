@@ -1,10 +1,8 @@
 "use client";
 
-import { sendGAEvent } from "@next/third-parties/google";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { submitAnswer, updateAnswer } from "@/app/actions";
+import { readOwnAnswer, submitAnswer, updateAnswer } from "@/app/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -16,11 +14,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { loadEditCredential, saveEditCredential } from "@/lib/local-storage";
+import {
+  loadEditCredential,
+  removeEditCredential,
+  saveEditCredential,
+} from "@/lib/local-storage";
 import { MARK_META } from "@/lib/marks";
 import type { Mark } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
-import type { ExistingAnswerSet } from "./page";
 
 export interface SlotView {
   id: string;
@@ -50,14 +51,11 @@ export function AnswerForm({
   slug,
   slots,
   closed,
-  existing,
 }: {
   slug: string;
   slots: SlotView[];
   closed: boolean;
-  existing: ExistingAnswerSet[];
 }) {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [comment, setComment] = useState("");
   // 初期値は空。既存回答の有無が分かってから既定値か既存回答を入れる
@@ -68,39 +66,60 @@ export function AnswerForm({
     participantId: string;
     editToken: string;
   } | null>(null);
+  const [credentialReady, setCredentialReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // 既存回答があれば初期表示（再編集導線）。無ければ全候補に既定値を入れる。
+  // localStorage の資格情報を読んでから、本人の回答だけをサーバーに問い合わせる。
+  // 資格確認前には既定値を入れないため、再編集時に追加候補を誤って「未定」にしない。
   useEffect(() => {
     const credential = loadEditCredential(slug);
-    const mine = credential
-      ? existing.find((item) => item.participantId === credential.participantId)
-      : undefined;
+    let cancelled = false;
+    setCredentialReady(false);
+    setEditCredential(null);
 
-    if (credential && mine) {
+    if (!credential) {
+      if (!defaultsApplied.current) {
+        defaultsApplied.current = true;
+        setMarks(buildDefaultMarks(slots));
+      }
+      setCredentialReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    startTransition(async () => {
+      const result = await readOwnAnswer({ slug, ...credential });
+      if (cancelled) return;
+      if (!result.ok) {
+        // 削除済み回答などの古い資格は、新規回答の妨げにしない。
+        // サーバーが本人データを返す前に破棄するため、情報は漏らさない。
+        removeEditCredential(slug);
+        if (!defaultsApplied.current) {
+          defaultsApplied.current = true;
+          setMarks(buildDefaultMarks(slots));
+        }
+        setCredentialReady(true);
+        return;
+      }
       setEditCredential(credential);
-      setName(mine.name);
-      setComment(mine.comment);
+      setName(result.data.name);
+      setComment(result.data.comment);
       // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
-      // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
       setMarks(() => {
         const next: MarkSelection = {};
-        for (const slot of slots) {
-          next[slot.id] = mine.marks[slot.id];
-        }
+        for (const slot of slots) next[slot.id] = result.data.marks[slot.id];
         return next;
       });
-      return;
-    }
+      setCredentialReady(true);
+    });
 
-    // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
-    if (!defaultsApplied.current) {
-      defaultsApplied.current = true;
-      setMarks(buildDefaultMarks(slots));
-    }
-  }, [slug, existing, slots]);
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, slots]);
 
   function setMark(slotId: string, mark: Mark) {
     setMarks((prev) => ({ ...prev, [slotId]: mark }));
@@ -160,12 +179,8 @@ export function AnswerForm({
           participantId: result.data.participantId,
           editToken: result.data.editToken,
         });
-        sendGAEvent("event", "submit_answer", {
-          candidate_count: answers.length,
-        });
       }
       setDone(true);
-      router.refresh();
     });
   }
 
@@ -181,6 +196,16 @@ export function AnswerForm({
             集計を見る
           </Link>
         </CardContent>
+      </Card>
+    );
+  }
+
+  if (!credentialReady) {
+    return (
+      <Card data-testid="answer-loading">
+        <CardHeader>
+          <CardTitle>回答情報を確認しています</CardTitle>
+        </CardHeader>
       </Card>
     );
   }
@@ -221,11 +246,6 @@ export function AnswerForm({
           <Link
             href="/"
             className="font-medium text-primary underline-offset-4 hover:underline"
-            onClick={() =>
-              sendGAEvent("event", "create_own_click", {
-                source: "answer_done",
-              })
-            }
           >
             自分も日程調整をつくる →
           </Link>

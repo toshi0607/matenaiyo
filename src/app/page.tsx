@@ -52,7 +52,7 @@ const STEPS = [
 
 const FEATURES = [
   { icon: "🗓️", text: "カレンダー UI で候補日をかんたん選択" },
-  { icon: "⚡", text: "回答が即座に画面へ反映されるリアルタイム集計" },
+  { icon: "⚡", text: "回答を約5秒間隔で反映する自動更新集計" },
   { icon: "📅", text: "確定後は .ics ダウンロードと Google カレンダー連携" },
   { icon: "🌙", text: "ダークモードに対応" },
   { icon: "📱", text: "スマホでも使いやすい最適化レイアウト" },

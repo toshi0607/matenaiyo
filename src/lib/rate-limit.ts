@@ -20,6 +20,18 @@ export const ANSWER_LIMIT: RateLimitRule = {
   limit: 30,
   window: "10 m",
 };
+// 単一イベントへの自動大量投稿を抑える。IP 制限とは独立して両方を適用する。
+export const ANSWER_EVENT_LIMIT: RateLimitRule = {
+  name: "answer-event",
+  limit: 100,
+  window: "10 m",
+};
+// OGP は公開エンドポイントなので、クローラ以外の連続取得をIP単位で抑える。
+export const OGP_IMAGE_LIMIT: RateLimitRule = {
+  name: "ogp-image",
+  limit: 60,
+  window: "10 m",
+};
 
 let cachedRedis: Redis | null | undefined;
 

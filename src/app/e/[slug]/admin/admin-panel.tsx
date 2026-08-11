@@ -1,9 +1,7 @@
 "use client";
 
-import { sendGAEvent } from "@next/third-parties/google";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   addSlots,
@@ -11,6 +9,7 @@ import {
   decideSlot,
   deleteParticipant,
   deleteSlot,
+  readAdminEvent,
 } from "@/app/actions";
 import { SlotPicker, useSlotPicker } from "@/components/slot-picker";
 import { Button } from "@/components/ui/button";
@@ -57,22 +56,16 @@ interface RunOptions {
   scope?: ErrorScope;
 }
 
-export function AdminPanel({
-  slug,
-  closed,
-  decidedSlotId,
-  slots,
-  participants,
-}: {
-  slug: string;
-  closed: boolean;
-  decidedSlotId: string | null;
-  slots: AdminSlot[];
-  participants: AdminParticipant[];
-}) {
-  const router = useRouter();
+export function AdminPanel({ slug }: { slug: string }) {
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [adminData, setAdminData] = useState<{
+    closed: boolean;
+    decidedSlotId: string | null;
+    slots: AdminSlot[];
+    participants: AdminParticipant[];
+  } | null>(null);
+  const [credentialRejected, setCredentialRejected] = useState(false);
   const [error, setError] = useState<AdminError | null>(null);
   // 実行中の操作の種類。進行中コピーを実際に押した操作にだけ出すために持つ。
   const [busyScope, setBusyScope] = useState<ErrorScope | null>(null);
@@ -83,8 +76,31 @@ export function AdminPanel({
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setAdminToken(loadAdminToken(slug));
-    setReady(true);
+    const token = loadAdminToken(slug);
+    let cancelled = false;
+    setAdminToken(token);
+    setReady(false);
+    setCredentialRejected(false);
+    setAdminData(null);
+    if (!token) {
+      setReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+    startTransition(async () => {
+      const result = await readAdminEvent({ slug, adminToken: token });
+      if (cancelled) return;
+      if (!result.ok) {
+        setCredentialRejected(true);
+      } else {
+        setAdminData(result.data);
+      }
+      setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   function run(
@@ -104,15 +120,27 @@ export function AdminPanel({
         return;
       }
       onSuccess?.();
-      router.refresh();
+      const refreshed = await readAdminEvent({ slug, adminToken });
+      if (!refreshed.ok) {
+        setAdminData(null);
+        setCredentialRejected(true);
+        return;
+      }
+      setAdminData(refreshed.data);
     });
   }
 
   if (!ready) {
-    return null;
+    return (
+      <Card data-testid="admin-loading">
+        <CardHeader>
+          <CardTitle>管理情報を確認しています</CardTitle>
+        </CardHeader>
+      </Card>
+    );
   }
 
-  if (!adminToken) {
+  if (!adminToken || credentialRejected || !adminData) {
     return (
       <Card data-testid="admin-not-recognized">
         <CardHeader>
@@ -124,6 +152,8 @@ export function AdminPanel({
       </Card>
     );
   }
+
+  const { closed, decidedSlotId, participants, slots } = adminData;
 
   const remainingSlots = MAX_SLOTS_PER_EVENT - slots.length;
   const selectedCount = picker.slotInputs.length;
@@ -148,7 +178,6 @@ export function AdminPanel({
     run(() => addSlots({ slug, adminToken, slots: picker.slotInputs }), {
       scope: "add",
       onSuccess: () => {
-        sendGAEvent("event", "add_slots", { candidate_count: selectedCount });
         picker.reset();
         setAdding(false);
       },
@@ -255,7 +284,6 @@ export function AdminPanel({
                             deleteSlot({ slug, adminToken, slotId: slot.id }),
                           {
                             onSuccess: () => {
-                              sendGAEvent("event", "delete_slot");
                               setConfirmingKey(null);
                             },
                           },
@@ -271,17 +299,12 @@ export function AdminPanel({
                           variant="outline"
                           disabled={pending}
                           onClick={() =>
-                            run(
-                              () =>
-                                decideSlot({
-                                  slug,
-                                  adminToken,
-                                  slotId: slot.id,
-                                }),
-                              {
-                                onSuccess: () =>
-                                  sendGAEvent("event", "decide_slot"),
-                              },
+                            run(() =>
+                              decideSlot({
+                                slug,
+                                adminToken,
+                                slotId: slot.id,
+                              }),
                             )
                           }
                           data-testid={`decide-slot-${slot.id}`}

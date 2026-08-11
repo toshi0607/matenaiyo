@@ -37,7 +37,7 @@ ${buildFaqSection()}
 - ソースコード(OSS): ${SITE_GITHUB_URL}
 
 ## 技術スタック
-- Next.js (App Router) / React / TypeScript / Supabase (Postgres + Realtime) / Drizzle ORM / Vercel
+- Next.js (App Router) / React / TypeScript / Postgres (Supabase Postgresを含む) / Drizzle ORM / Vercel
 `;
 }
 

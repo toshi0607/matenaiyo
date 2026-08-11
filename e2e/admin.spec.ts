@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { selectCurrentMonthDays } from "./helpers";
+import { beginEventCreation, selectCurrentMonthDays } from "./helpers";
 
 // 幹事管理: starts_at 付き候補を作成 → 回答 → 確定 →
 // イベントページに確定バナー + .ics/Google カレンダー連携が出ることを検証する。
@@ -7,7 +7,7 @@ test("admin decides a dated slot and calendar links appear", async ({
   page,
 }) => {
   // #given starts_at 付き候補を1件作成する(作成端末に adminToken が保存される)
-  await page.goto("/new?title=確定テスト飲み会");
+  await beginEventCreation(page, "確定テスト飲み会");
   // 当月の1日を選ぶと既定時刻19:00の starts_at 付き候補が1件できる
   await selectCurrentMonthDays(page, [15]);
   await expect(page.getByTestId("selected-slot")).toHaveCount(1);
@@ -58,7 +58,7 @@ test("admin decides a dated slot and calendar links appear", async ({
 // 最後の1件は削除できない。
 test("organizer adds and deletes candidate slots", async ({ page }) => {
   // #given 候補1件のイベントを作り、回答を1件登録する
-  await page.goto("/new?title=候補追加テスト");
+  await beginEventCreation(page, "候補追加テスト");
   await selectCurrentMonthDays(page, [10]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
@@ -143,7 +143,7 @@ test("a slot added after answering stays unanswered for the existing respondent"
   page,
 }) => {
   // #given 候補2件のイベントに1人が回答している
-  await page.goto("/new?title=新候補テスト");
+  await beginEventCreation(page, "新候補テスト");
   await selectCurrentMonthDays(page, [10, 11]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
@@ -194,7 +194,7 @@ test("non-admin device sees no admin link and a not-recognized notice", async ({
   browser,
 }) => {
   // #given 作成端末でイベントを作る
-  await page.goto("/new?title=非幹事テスト");
+  await beginEventCreation(page, "非幹事テスト");
   await selectCurrentMonthDays(page, [1, 2]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();

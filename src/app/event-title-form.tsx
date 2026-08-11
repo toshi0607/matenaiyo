@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { saveEventTitleDraft } from "@/lib/local-storage";
 
 export function EventTitleForm() {
   const router = useRouter();
@@ -18,9 +19,8 @@ export function EventTitleForm() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = title.trim();
-    const query = trimmed ? `?title=${encodeURIComponent(trimmed)}` : "";
-    router.push(`/new${query}`);
+    saveEventTitleDraft(title);
+    router.push("/new");
   }
 
   return (

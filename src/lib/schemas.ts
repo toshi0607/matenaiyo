@@ -16,6 +16,9 @@ export const slotInputSchema = z
 /** 1 イベントが持てる候補日程の上限。フォームとサーバー検証で共有する。 */
 export const MAX_SLOTS_PER_EVENT = 50;
 
+/** 1 イベントが受け付けられる回答者数の上限。 */
+export const MAX_PARTICIPANTS_PER_EVENT = 100;
+
 export const createEventSchema = z.object({
   title: z.string().trim().min(1).max(100),
   description: z.string().trim().max(2000).default(""),
@@ -52,7 +55,20 @@ export const updateAnswerSchema = submitAnswerSchema.extend({
 
 const adminActionSchema = z.object({
   slug: slugSchema,
-  adminToken: z.string().min(1),
+  adminToken: z.string().min(1).max(512),
+});
+
+const credentialSchema = z.string().min(1).max(512);
+
+export const readOwnAnswerSchema = z.object({
+  slug: slugSchema,
+  participantId: z.uuid(),
+  editToken: credentialSchema,
+});
+
+export const readAdminEventSchema = z.object({
+  slug: slugSchema,
+  adminToken: credentialSchema,
 });
 
 export const closeEventSchema = adminActionSchema;
@@ -78,6 +94,8 @@ export type SlotInput = z.input<typeof slotInputSchema>;
 export type CreateEventInput = z.input<typeof createEventSchema>;
 export type SubmitAnswerInput = z.input<typeof submitAnswerSchema>;
 export type UpdateAnswerInput = z.input<typeof updateAnswerSchema>;
+export type ReadOwnAnswerInput = z.input<typeof readOwnAnswerSchema>;
+export type ReadAdminEventInput = z.input<typeof readAdminEventSchema>;
 export type CloseEventInput = z.input<typeof closeEventSchema>;
 export type DecideSlotInput = z.input<typeof decideSlotSchema>;
 export type DeleteParticipantInput = z.input<typeof deleteParticipantSchema>;

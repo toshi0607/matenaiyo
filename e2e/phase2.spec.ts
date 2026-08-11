@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { selectCurrentMonthDays } from "./helpers";
+import { beginEventCreation, selectCurrentMonthDays } from "./helpers";
 
 // ダークモード: ヘッダのトグルで html に dark クラスが付く
 test("theme toggle switches to dark mode", async ({ page }) => {
@@ -30,7 +30,7 @@ test("theme toggle switches to dark mode", async ({ page }) => {
 test("selected marks keep their fill color in dark mode", async ({ page }) => {
   // #given ダークモードで候補1件のイベントを作る
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/new?title=ダーク選択色");
+  await beginEventCreation(page, "ダーク選択色");
   await selectCurrentMonthDays(page, [10]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
@@ -60,7 +60,7 @@ test("tally auto-refreshes when another user answers", async ({
   browser,
 }) => {
   // #given イベントを作成する
-  await page.goto("/new?title=自動更新テスト");
+  await beginEventCreation(page, "自動更新テスト");
   await selectCurrentMonthDays(page, [1, 2]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();

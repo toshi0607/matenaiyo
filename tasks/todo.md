@@ -1,3 +1,49 @@
+# Codex Security 6件の修正（2026-08-09）
+
+対象: scan `dd91adb0-0fd5-427a-bcb8-ac4f130593c4` の全finding。設計・レビューは高精度モデル、実装は下位モデルのworkerを逐次実行し、同一worktreeで複数writerを動かさない。
+
+## Patch contract
+
+| 境界 | 攻撃者 / 破られた不変条件 | 修正後も守る正規挙動 | 回帰証拠 |
+|---|---|---|---|
+| Supabase Data API / Realtime | 公開anon key保有者 / DBはServer Actionを迂回できない | 集計は約5秒で自動更新、サーバーDB接続は継続 | 全4テーブルのRLS有効化・anon相当roleのCRUD拒否、ブラウザSupabase依存消滅 |
+| answer/admin read | 共有URL保有者・偽localStorage値 / token検証前にコメント・内部IDを返さない | 同じ端末では自分の回答を再編集、作成端末では幹事管理 | 未認証HTML/RSCに秘密値なし、有効tokenは自分だけ/管理DTO、偽tokenは拒否 |
+| answer storage | 共有URL保有者 / 1イベントの永続行数は有限 | 匿名回答と編集、最大50候補 | event行lock下で最大100参加者、競合しても101人目なし、拒否時activity不更新 |
+| OGP work/privacy | 任意のInternet client / 不正・不存在slugで高コスト処理しない、titleをfont providerへ送らない | 有効イベントの回答数入りOGP | 不正slugはDB前、不存在はrender前に終了、外部font fetchなし、有効OGPはPNG |
+| Analytics | GA受信者 / capability URL・title queryを第三者へ送らない | タイトルをトップから作成画面へ引継ぐ | ブラウザ分析依存なし、タイトルはsessionStorageで引継ぎ |
+
+既存helperは `slugSchema`、`verifyToken`、`slotLabel`、`tallySlots`、`clientIdentifier`、`load*Credential` を再利用する。Server Actionは直接到達可能な未信頼入口として入力検証・token認可・最小DTO返却を必須とする。
+
+## Decision log
+
+- RLSは4テーブルすべてに有効化しpolicyを作らないdeny-by-defaultとする。アプリのサーバー接続（owner/service role）は既存どおり利用し、公開Realtimeは廃止する。
+- 参加者上限は100人。既存のevent行`FOR UPDATE`の内側でcountし、上限到達時はinsertと`lastActivityAt`更新を行わない。
+- answer/adminのページ本体は公開情報だけを取得し、localStorage tokenを渡す専用Server Actionが認可後に必要最小DTOを返す。Mutation後は認可済みDTOを再取得する。
+- reviewerでSPA遷移後もGA runtimeが残る可能性を確認したため、ブラウザAnalytics自体を廃止した。トップから作成画面へのタイトル引継ぎはURL queryではなくsessionStorageを使う。
+- reviewerでNext 16が明示fontに未収録のUnicodeをGoogle Fontsへ自動送信することを実測したため、OGPからUGC titleを除外し、ASCII固定文と回答数だけを描画する。slug形式検証直後のIP制限で不存在slugのDB照会も境界内に置く。
+
+## Todo
+
+- [x] 1. 認可済みread DTOとanswer/admin clientの遅延ロードを実装し、未認証RSC漏洩の回帰テストを追加
+- [x] 2. 参加者100人上限をevent lock内で実装し、上限・拒否時activity不変を実DB E2Eで検証
+- [x] 3. 全テーブルRLS migration/schemaを追加し、schema testと`pg_class`で有効化を検証
+- [x] 4. browser Supabase Realtimeを削除してポーリングに一本化、依存・env・文書を更新
+- [x] 5. OGPの早期拒否とUGC非描画を実装し、有効/不存在/不正slugをE2E検証
+- [x] 6. ブラウザAnalyticsを廃止し、sessionStorage title引継ぎとquery除去をE2E検証
+- [x] 7. 独立reviewerのセキュリティ・回帰レビュー3件を反映
+- [x] 8. `pnpm check` / `pnpm test` / `pnpm build` / DB migration / Playwright E2Eを実行
+- [x] 9. scan artifactsの`artifacts/fix_report.md`と本節Reviewを完成
+
+## Review
+
+結果: 6 findingすべて `fixed`。`pnpm check` exit 0、`pnpm test` 88 passed、`pnpm build` exit 0、`pnpm db:migrate`成功、`pg_class`で4テーブルのRLS=true/force=false、`playwright --workers=1` 20 passed。
+
+Exploit closure: 公開Supabase client/dependency消滅、RLS deny-by-default、token検証前RSCからparticipant/comment/ID消滅、101人目拒否かつ`last_activity_at`不変、不存在OGPは描画前404かつDB前IP制限、外部font/GA依存ゼロ。保持した挙動: 匿名作成・回答、自分の再編集、幹事操作、5秒自動更新、回答数入りOGP、トップからのタイトル引継ぎ。
+
+残余リスク: 上限直前の2同時投稿専用テストと実Supabase anon keyによるData APIテストは未実施。ただしevent行`FOR UPDATE`による直列化、migrationのRLS有効化、ローカル実DBのcatalog値で境界を確認した。
+
+---
+
 # 幹事による候補日程の追加・削除(2026-07-25)
 
 対象画面: `/e/[slug]/admin`(「幹事管理」= 候補ごとの ○△× 集計を見ながら操作する幹事用ページ)。

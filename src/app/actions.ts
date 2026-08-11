@@ -1,10 +1,17 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { answers, events, participants, slots } from "@/db/schema";
 import {
+  type AdminEventDTO,
+  getAdminEventDTO,
+  getOwnAnswerDTO,
+  type OwnAnswerDTO,
+} from "@/lib/event-access";
+import {
+  ANSWER_EVENT_LIMIT,
   ANSWER_LIMIT,
   CREATE_EVENT_LIMIT,
   checkRateLimit,
@@ -17,7 +24,10 @@ import {
   decideSlotSchema,
   deleteParticipantSchema,
   deleteSlotSchema,
+  MAX_PARTICIPANTS_PER_EVENT,
   MAX_SLOTS_PER_EVENT,
+  readAdminEventSchema,
+  readOwnAnswerSchema,
   submitAnswerSchema,
   updateAnswerSchema,
 } from "@/lib/schemas";
@@ -38,6 +48,7 @@ const EVENT_CLOSED = "このイベントは締め切られています";
 const RATE_LIMITED =
   "リクエストが多すぎます。しばらく待ってからお試しください。";
 const SLOT_LIMIT_EXCEEDED = `候補は最大${MAX_SLOTS_PER_EVENT}件までです`;
+const PARTICIPANT_LIMIT_EXCEEDED = `このイベントの回答者は最大${MAX_PARTICIPANTS_PER_EVENT}人までです`;
 // 重複を除いた残りは追加するため、このエラーは「選んだ全件が既存と重複」のときだけ返る。
 const SLOT_DUPLICATED = "選んだ候補はすべて追加済みです";
 const LAST_SLOT_KEPT = "候補が1件のときは削除できません";
@@ -65,6 +76,37 @@ async function findAdminEvent(slug: string, adminToken: string) {
     return null;
   }
   return event;
+}
+
+/** 編集資格を確認済みの本人の回答だけを返す。 */
+export async function readOwnAnswer(
+  input: unknown,
+): Promise<ActionResult<OwnAnswerDTO>> {
+  const parsed = readOwnAnswerSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: INVALID_INPUT };
+
+  const ownAnswer = await getOwnAnswerDTO(
+    parsed.data.slug,
+    parsed.data.participantId,
+    parsed.data.editToken,
+  );
+  if (!ownAnswer) return { ok: false, error: OPERATION_FAILED };
+  return { ok: true, data: ownAnswer };
+}
+
+/** 管理資格を確認済みの集計 DTO だけを返す。 */
+export async function readAdminEvent(
+  input: unknown,
+): Promise<ActionResult<AdminEventDTO>> {
+  const parsed = readAdminEventSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: INVALID_INPUT };
+
+  const adminEvent = await getAdminEventDTO(
+    parsed.data.slug,
+    parsed.data.adminToken,
+  );
+  if (!adminEvent) return { ok: false, error: OPERATION_FAILED };
+  return { ok: true, data: adminEvent };
 }
 
 export async function createEvent(
@@ -122,6 +164,9 @@ export async function submitAnswer(
   if (!(await checkRateLimit(ANSWER_LIMIT, await clientIdentifier()))) {
     return { ok: false, error: RATE_LIMITED };
   }
+  if (!(await checkRateLimit(ANSWER_EVENT_LIMIT, slug))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   const event = await findEventWithSlots(slug);
   if (!event) {
@@ -137,7 +182,7 @@ export async function submitAnswer(
   }
 
   const editToken = generateToken();
-  let result: { closed: true } | { id: string };
+  let result: { closed: true } | { capacity: true } | { id: string };
   try {
     result = await db.transaction(async (tx) => {
       // 締切との競合を防ぐため、行ロック下で status を再確認する(TOCTOU 回避)。
@@ -148,6 +193,13 @@ export async function submitAnswer(
         .for("update");
       if (!locked || locked.status === "closed") {
         return { closed: true };
+      }
+      const [participantCount] = await tx
+        .select({ value: count() })
+        .from(participants)
+        .where(eq(participants.eventId, event.id));
+      if ((participantCount?.value ?? 0) >= MAX_PARTICIPANTS_PER_EVENT) {
+        return { capacity: true };
       }
       const [participant] = await tx
         .insert(participants)
@@ -177,6 +229,9 @@ export async function submitAnswer(
 
   if ("closed" in result) {
     return { ok: false, error: EVENT_CLOSED };
+  }
+  if ("capacity" in result) {
+    return { ok: false, error: PARTICIPANT_LIMIT_EXCEEDED };
   }
 
   revalidatePath(eventPath(slug));

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { selectCurrentMonthDays } from "./helpers";
+import { beginEventCreation, selectCurrentMonthDays } from "./helpers";
 
 // Phase 3b: OGP画像 / LINE共有 / 自動削除 cron の誤爆防止
 
@@ -8,7 +8,7 @@ async function createEvent(
   page: import("@playwright/test").Page,
   title: string,
 ): Promise<string> {
-  await page.goto(`/new?title=${encodeURIComponent(title)}`);
+  await beginEventCreation(page, title);
   await selectCurrentMonthDays(page, [10, 11]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();
@@ -27,6 +27,20 @@ test("OGP image endpoint returns an image", async ({ page }) => {
   // #then 200 かつ画像
   expect(res.status()).toBe(200);
   expect(res.headers()["content-type"]).toMatch(/^image\//);
+});
+
+test("OGP image returns 404 for malformed and nonexistent slugs", async ({
+  page,
+}) => {
+  const malformed = await page.request.get(
+    "/e/not-a-valid-slug/opengraph-image",
+  );
+  expect(malformed.status()).toBe(404);
+
+  const missing = await page.request.get(
+    "/e/aaaaaaaaaaaaaaaaaaaaa/opengraph-image",
+  );
+  expect(missing.status()).toBe(404);
 });
 
 test("LINE share button links to LINE share URL", async ({ page }) => {

@@ -20,3 +20,15 @@ export async function selectCurrentMonthDays(
   }
   await expect(page.getByTestId("calendar-day")).toHaveCount(days.length);
 }
+
+/** Exercise the real home -> sessionStorage -> /new title handoff. */
+export async function beginEventCreation(
+  page: Page,
+  title: string,
+): Promise<void> {
+  await page.goto("/");
+  await page.getByTestId("home-title-input").fill(title);
+  await page.getByTestId("home-submit").click();
+  await expect(page).toHaveURL(/\/new$/);
+  await expect(page.getByTestId("title-input")).toHaveValue(title);
+}

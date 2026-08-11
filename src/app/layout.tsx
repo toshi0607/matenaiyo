@@ -1,4 +1,3 @@
-import { GoogleAnalytics } from "@next/third-parties/google";
 import type { Metadata } from "next";
 import { Zen_Maru_Gothic } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
@@ -47,7 +46,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const gaId = process.env.NEXT_PUBLIC_GA_ID;
   return (
     <html
       lang="ja"
@@ -66,7 +64,6 @@ export default function RootLayout({
           <SiteFooter />
         </ThemeProvider>
       </body>
-      {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
     </html>
   );
 }

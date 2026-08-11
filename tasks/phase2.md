@@ -7,11 +7,11 @@
 - [x] **カレンダー選択UI** — `/new` で shadcn Calendar(react-day-picker）で複数日タップ選択 + 時刻テンプレ(12:00/18:00/19:00/終日）。`startsAt` 付き slot を `createEvent` に渡す。テキスト入力もトグルで残す(既定はテキスト)
 - [x] **モバイル回答カード強化** — ○/△/× を 44px 高のタップ領域に、送信ボタンをモバイルで sticky 表示
 - [x] **ダークモード** — next-themes 導入。layout に ThemeProvider + 共通ヘッダ(SiteHeader)にトグル。既存 `.dark` CSS 変数を利用
-- [x] **リアルタイム集計 / 自動更新** — `/e/[slug]` に LiveRefresh。Supabase 設定時は postgres_changes 購読、未設定時は 5秒ポーリング(非表示タブは停止)。どちらも `router.refresh()`
+- [x] **自動更新集計** — `/e/[slug]` に LiveRefresh。約5秒ごとのポーリングで `router.refresh()` を実行し、非表示タブでは停止する。
 
 ## 方針メモ
 
-- Realtime: `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` があれば `@supabase/supabase-js` の postgres_changes を購読。無ければ ~5秒ポーリング。どちらも `router.refresh()` でサーバーを真実の源にする(差分マージしない)
+- 自動更新: 約5秒ごとのポーリングで `router.refresh()` を実行し、サーバーを真実の源にする(差分マージしない)。非表示タブでは停止する。
 - カレンダー slot は `starts_at` を持つ。`slot-label.ts` が既に starts_at 表示に対応済み
 
 ## 検証(完了条件)
@@ -37,4 +37,3 @@ reviewer subagent(新規コンテキスト)による Phase 2 レビュー: **承
 - [x] **L1**: Realtime 購読を当該イベントに限定。全書き込み Action が同一トランザクションで
   `events.last_activity_at` を更新するため、`events` テーブル1本を `filter: id=eq.<eventId>` で購読する方式に変更
   (answers に event_id 列が無いため、3テーブル購読より正確かつ簡潔)。チャンネル名は `matenaiyo-tally-<eventId>`。
-- [x] **L2**: `@supabase/supabase-js` の import 失敗時に `console.warn` 1行(エラー内容付き)を出してからポーリングに退避。

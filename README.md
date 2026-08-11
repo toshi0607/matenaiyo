@@ -10,10 +10,10 @@
 
 - **カレンダーUIで候補日選択** — カレンダーをタップして候補日を複数選択し、各日に時刻を設定(プリセット追加・自由入力・終日指定に対応)
 - **○△×で出欠回答** — 名前 + 各候補日への回答 + ひとことコメント
-- **リアルタイム集計** — 誰かが回答すると開いている画面が自動で更新される(Supabase Realtime を購読、未設定時は約5秒間隔のポーリングにフォールバック)
+- **自動更新集計** — 誰かが回答すると開いている画面が約5秒間隔で自動更新される(非表示タブではポーリングを停止)
 - **日程確定 → カレンダー連携** — 幹事が日程を確定すると `.ics` ダウンロードと Google カレンダー追加リンクを表示
 - **候補日程の追加・削除** — 幹事管理ページ(`/e/[slug]/admin`)で、集計を見ながら候補日程を後から追加・削除できる(削除するとその候補への回答も消え、候補は最低1件残る)
-- **OGP画像自動生成** — トップページは静的OGP画像、イベントページ(`/e/[slug]`)は `next/og` でイベント名・回答件数を反映した画像を動的生成
+- **OGP画像自動生成** — トップページは静的OGP画像、イベントページ(`/e/[slug]`)は `next/og` で回答件数を反映した画像を動的生成
 - **ダークモード対応**
 - **回答の再編集** — 参加者ごとの編集トークンをlocalStorageに保持し、同じ端末から自分の回答を編集可能
 - **期限切れイベントの自動削除** — 最終更新から一定期間で削除対象になり、事前に削除予告を表示(Vercel Cronで実行)
@@ -24,7 +24,7 @@
 |---|---|
 | フレームワーク | Next.js 16 (App Router) + React 19 + TypeScript |
 | UI | Tailwind CSS v4 + shadcn/ui(カレンダーは react-day-picker) |
-| DB + リアルタイム | Supabase(Postgres + Realtime) |
+| DB | Postgres(Supabase Postgresを含む) |
 | ORM | Drizzle ORM |
 | バリデーション | Zod |
 | レート制限 | Upstash Redis(`@upstash/ratelimit`) |
@@ -52,7 +52,7 @@ docker compose up -d
 
 ### 3. 環境変数の設定
 
-`.env.example` をコピーして `.env` を作成します。ローカル開発では `DATABASE_URL` 以外は未設定でも動作します(Realtimeはポーリングにフォールバック、レート制限は無効)。
+`.env.example` をコピーして `.env` を作成します。ローカル開発では `DATABASE_URL` 以外は未設定でも動作します(レート制限は無効)。
 
 ```bash
 cp .env.example .env
@@ -61,10 +61,8 @@ cp .env.example .env
 | 変数 | 用途 | 未設定時の挙動 |
 |---|---|---|
 | `DATABASE_URL` | Postgres接続文字列 | 必須 |
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 集計ページのRealtime購読 | 両方揃わない場合は約5秒間隔のポーリングにフォールバック |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 作成・回答系ActionのIPベースレート制限 | 未設定ならレート制限は無効(ローカル/CI向け) |
 | `CRON_SECRET` | `/api/cron/cleanup` の認証(Vercel Cronが自動付与) | 未設定だとエンドポイントは500を返し、誤削除を防ぐ安全側に倒す |
-| `NEXT_PUBLIC_GA_ID` | Google Analytics 4の測定ID | 未設定ならスクリプトを読み込まない |
 
 ### 4. DBマイグレーションの適用
 

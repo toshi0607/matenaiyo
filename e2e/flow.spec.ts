@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { selectCurrentMonthDays } from "./helpers";
+import { beginEventCreation, selectCurrentMonthDays } from "./helpers";
+
+test("/new removes query titles before rendering the creation form", async ({
+  page,
+}) => {
+  await page.goto(
+    "/new?title=URL%E3%81%AB%E8%BC%89%E3%81%9B%E3%81%AA%E3%81%84",
+  );
+
+  await expect(page).toHaveURL(/\/new$/);
+  await expect(page.getByTestId("title-input")).toHaveValue("");
+});
 
 // 作成 → 共有URLを開く → 回答 → 集計反映 の一気通貫フロー
 test("create event, answer, and see tally reflected", async ({ page }) => {
@@ -53,7 +64,7 @@ test("create event, answer, and see tally reflected", async ({ page }) => {
 // 同一端末での再編集導線
 test("re-edit own answer from the same device", async ({ page }) => {
   // #given イベントを作成して回答済み
-  await page.goto("/new?title=歓迎会");
+  await beginEventCreation(page, "歓迎会");
   await selectCurrentMonthDays(page, [10, 11]);
   await page.getByTestId("create-submit").click();
   const shareUrl = await page.getByTestId("share-url").inputValue();

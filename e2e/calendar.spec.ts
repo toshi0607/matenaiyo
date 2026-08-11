@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { selectCurrentMonthDays } from "./helpers";
+import { beginEventCreation, selectCurrentMonthDays } from "./helpers";
 
 // カレンダーで候補日を選び、既定時刻+プリセットで候補を作ってイベントを作成するフロー
 test("create event by selecting days and adding a preset time", async ({
   page,
 }) => {
   // #given /new を開いてタイトルを確認
-  await page.goto("/new?title=カレンダー飲み会");
+  await beginEventCreation(page, "カレンダー飲み会");
   await expect(page.getByTestId("title-input")).toHaveValue("カレンダー飲み会");
 
   // #when 当月の2日を選ぶ(各日に既定時刻19:00が自動で付き、候補2件になる)
@@ -39,7 +39,7 @@ test("start time can be freely edited and reflects in the preview", async ({
   page,
 }) => {
   // #given /new を開いて当月の1日を選ぶ
-  await page.goto("/new?title=時刻編集テスト");
+  await beginEventCreation(page, "時刻編集テスト");
   await selectCurrentMonthDays(page, [12]);
 
   // #then 既定時刻19:00の候補が1件できている
@@ -62,7 +62,7 @@ test("start time can be freely edited and reflects in the preview", async ({
 // 候補が上限(50件)を超えたら送信前にエラーで弾く(サーバー到達前のUXガード)
 test("rejects more than 50 slots before submitting", async ({ page }) => {
   // #given /new を開いて当月の1日を選ぶ(既定時刻で1件)
-  await page.goto("/new?title=大量候補");
+  await beginEventCreation(page, "大量候補");
   await selectCurrentMonthDays(page, [10]);
 
   // #when 「時間を追加」で候補を51件まで増やす

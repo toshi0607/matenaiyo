@@ -8,6 +8,13 @@
       "when": 1783167780228,
       "tag": "0000_burly_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786454120953,
+      "tag": "0001_blushing_princess_powerful",
+      "breakpoints": true
     }
   ]
 }
