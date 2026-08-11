@@ -20,8 +20,19 @@ export const ANSWER_LIMIT: RateLimitRule = {
   limit: 30,
   window: "10 m",
 };
+export const READ_TOKEN_LIMIT: RateLimitRule = {
+  name: "read-token",
+  limit: 60,
+  window: "10 m",
+};
 
 let cachedRedis: Redis | null | undefined;
+
+function hasUpstashRedisConfiguration(): boolean {
+  return Boolean(
+    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+  );
+}
 
 function getRedis(): Redis | null {
   if (cachedRedis !== undefined) {
@@ -29,7 +40,9 @@ function getRedis(): Redis | null {
   }
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  cachedRedis = url && token ? new Redis({ url, token }) : null;
+  cachedRedis = hasUpstashRedisConfiguration()
+    ? new Redis({ url, token })
+    : null;
   return cachedRedis;
 }
 
@@ -67,13 +80,16 @@ export async function clientIdentifier(): Promise<string> {
 }
 
 /**
- * レート制限を判定する。Upstash 未設定(ローカル/CI)なら常に許可する。
+ * レート制限を判定する。Upstash 未設定時は本番で拒否し、ローカル/CI では許可する。
  * @returns 許可なら true、超過なら false
  */
 export async function checkRateLimit(
   rule: RateLimitRule,
   identifier: string,
 ): Promise<boolean> {
+  if (!hasUpstashRedisConfiguration()) {
+    return process.env.NODE_ENV !== "production";
+  }
   const limiter = getLimiter(rule);
   if (!limiter) {
     return true;

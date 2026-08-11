@@ -50,6 +50,12 @@ export const updateAnswerSchema = submitAnswerSchema.extend({
   editToken: z.string().min(1),
 });
 
+export const getOwnAnswerSchema = z.object({
+  slug: slugSchema,
+  participantId: z.uuid(),
+  editToken: z.string().min(1),
+});
+
 const adminActionSchema = z.object({
   slug: slugSchema,
   adminToken: z.string().min(1),
@@ -73,13 +79,19 @@ export const deleteSlotSchema = adminActionSchema.extend({
   slotId: z.uuid(),
 });
 
+export const getAdminParticipantsSchema = adminActionSchema;
+
 export type Mark = z.infer<typeof markSchema>;
 export type SlotInput = z.input<typeof slotInputSchema>;
 export type CreateEventInput = z.input<typeof createEventSchema>;
 export type SubmitAnswerInput = z.input<typeof submitAnswerSchema>;
 export type UpdateAnswerInput = z.input<typeof updateAnswerSchema>;
+export type GetOwnAnswerInput = z.input<typeof getOwnAnswerSchema>;
 export type CloseEventInput = z.input<typeof closeEventSchema>;
 export type DecideSlotInput = z.input<typeof decideSlotSchema>;
 export type DeleteParticipantInput = z.input<typeof deleteParticipantSchema>;
 export type AddSlotsInput = z.input<typeof addSlotsSchema>;
 export type DeleteSlotInput = z.input<typeof deleteSlotSchema>;
+export type GetAdminParticipantsInput = z.input<
+  typeof getAdminParticipantsSchema
+>;

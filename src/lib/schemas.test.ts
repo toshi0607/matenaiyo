@@ -6,6 +6,8 @@ import {
   decideSlotSchema,
   deleteParticipantSchema,
   deleteSlotSchema,
+  getAdminParticipantsSchema,
+  getOwnAnswerSchema,
   MAX_SLOTS_PER_EVENT,
   markSchema,
   slotInputSchema,
@@ -188,7 +190,39 @@ describe("updateAnswerSchema", () => {
   });
 });
 
+describe("getOwnAnswerSchema", () => {
+  const valid = {
+    slug: SLUG,
+    participantId: UUID,
+    editToken: "tok",
+  };
+
+  it("requires a participant-scoped edit capability", () => {
+    expect(getOwnAnswerSchema.safeParse(valid).success).toBe(true);
+    expect(
+      getOwnAnswerSchema.safeParse({ ...valid, participantId: "not-a-uuid" })
+        .success,
+    ).toBe(false);
+    expect(
+      getOwnAnswerSchema.safeParse({ ...valid, editToken: "" }).success,
+    ).toBe(false);
+  });
+});
+
 describe("admin action schemas", () => {
+  it("getAdminParticipantsSchema requires slug and adminToken", () => {
+    expect(
+      getAdminParticipantsSchema.safeParse({
+        slug: SLUG,
+        adminToken: "tok",
+      }).success,
+    ).toBe(true);
+    expect(
+      getAdminParticipantsSchema.safeParse({ slug: SLUG, adminToken: "" })
+        .success,
+    ).toBe(false);
+  });
+
   it("closeEventSchema requires slug and adminToken", () => {
     expect(
       closeEventSchema.safeParse({ slug: SLUG, adminToken: "tok" }).success,

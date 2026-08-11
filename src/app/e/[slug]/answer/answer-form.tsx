@@ -4,7 +4,7 @@ import { sendGAEvent } from "@next/third-parties/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { submitAnswer, updateAnswer } from "@/app/actions";
+import { getOwnAnswer, submitAnswer, updateAnswer } from "@/app/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -20,7 +20,6 @@ import { loadEditCredential, saveEditCredential } from "@/lib/local-storage";
 import { MARK_META } from "@/lib/marks";
 import type { Mark } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
-import type { ExistingAnswerSet } from "./page";
 
 export interface SlotView {
   id: string;
@@ -42,20 +41,18 @@ const MARK_ACTIVE: Record<Mark, string> = {
 /** slotId -> 出欠。未選択(再編集時にまだ答えていない候補)は undefined。 */
 type MarkSelection = Record<string, Mark | undefined>;
 
-function buildDefaultMarks(slots: SlotView[]): MarkSelection {
-  return Object.fromEntries(slots.map((slot) => [slot.id, DEFAULT_MARK]));
+function buildDefaultMarks(slotIds: string[]): MarkSelection {
+  return Object.fromEntries(slotIds.map((slotId) => [slotId, DEFAULT_MARK]));
 }
 
 export function AnswerForm({
   slug,
   slots,
   closed,
-  existing,
 }: {
   slug: string;
   slots: SlotView[];
   closed: boolean;
-  existing: ExistingAnswerSet[];
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -70,37 +67,67 @@ export function AnswerForm({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [loadingOwnAnswer, setLoadingOwnAnswer] = useState(true);
   const [pending, startTransition] = useTransition();
+  // 親の再描画で slots 配列が作り直されても、同じ候補なら既存回答を読み直さない。
+  const slotIdsKey = JSON.stringify(slots.map((slot) => slot.id));
 
-  // 既存回答があれば初期表示（再編集導線）。無ければ全候補に既定値を入れる。
+  // localStorage の編集能力を使って、既存の自分の回答だけを読み込む。
   useEffect(() => {
+    const slotIds = JSON.parse(slotIdsKey) as string[];
+    const applyNewAnswerDefaults = () => {
+      defaultsApplied.current = true;
+      setEditCredential(null);
+      setName("");
+      setComment("");
+      setMarks(buildDefaultMarks(slotIds));
+      setError(null);
+    };
     const credential = loadEditCredential(slug);
-    const mine = credential
-      ? existing.find((item) => item.participantId === credential.participantId)
-      : undefined;
-
-    if (credential && mine) {
-      setEditCredential(credential);
-      setName(mine.name);
-      setComment(mine.comment);
-      // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
-      // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
-      setMarks(() => {
-        const next: MarkSelection = {};
-        for (const slot of slots) {
-          next[slot.id] = mine.marks[slot.id];
-        }
-        return next;
-      });
+    if (!credential) {
+      // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
+      if (!defaultsApplied.current) {
+        applyNewAnswerDefaults();
+      }
+      setLoadingOwnAnswer(false);
       return;
     }
+    let cancelled = false;
 
-    // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
-    if (!defaultsApplied.current) {
-      defaultsApplied.current = true;
-      setMarks(buildDefaultMarks(slots));
-    }
-  }, [slug, existing, slots]);
+    startTransition(async () => {
+      try {
+        const result = await getOwnAnswer({ slug, ...credential });
+        if (cancelled) return;
+        setLoadingOwnAnswer(false);
+        if (!result.ok) {
+          // 削除済み・失効済みの能力と一時的な通信失敗は区別できない。
+          // localStorage は残しつつ、新規回答として続けられるようにする。
+          applyNewAnswerDefaults();
+          return;
+        }
+        setEditCredential(credential);
+        setName(result.data.name);
+        setComment(result.data.comment);
+        // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
+        // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
+        setMarks(() => {
+          const next: MarkSelection = {};
+          for (const slotId of slotIds) {
+            next[slotId] = result.data.marks[slotId];
+          }
+          return next;
+        });
+      } catch {
+        if (cancelled) return;
+        setLoadingOwnAnswer(false);
+        applyNewAnswerDefaults();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, slotIdsKey]);
 
   function setMark(slotId: string, mark: Mark) {
     setMarks((prev) => ({ ...prev, [slotId]: mark }));
@@ -349,14 +376,16 @@ export function AnswerForm({
         <Button
           type="submit"
           className="h-11 min-h-11 flex-1"
-          disabled={pending}
+          disabled={pending || loadingOwnAnswer}
           data-testid="answer-submit"
         >
-          {pending
-            ? "送信中…"
-            : editCredential
-              ? "回答を更新する"
-              : "回答を送信する"}
+          {loadingOwnAnswer
+            ? "回答を読み込み中…"
+            : pending
+              ? "送信中…"
+              : editCredential
+                ? "回答を更新する"
+                : "回答を送信する"}
         </Button>
         <Link
           href={`/e/${slug}`}

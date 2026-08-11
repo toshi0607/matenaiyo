@@ -9,7 +9,9 @@ import {
   CREATE_EVENT_LIMIT,
   checkRateLimit,
   clientIdentifier,
+  READ_TOKEN_LIMIT,
 } from "@/lib/rate-limit";
+import type { Mark } from "@/lib/schemas";
 import {
   addSlotsSchema,
   closeEventSchema,
@@ -17,6 +19,8 @@ import {
   decideSlotSchema,
   deleteParticipantSchema,
   deleteSlotSchema,
+  getAdminParticipantsSchema,
+  getOwnAnswerSchema,
   MAX_SLOTS_PER_EVENT,
   submitAnswerSchema,
   updateAnswerSchema,
@@ -31,6 +35,19 @@ import {
 export type ActionResult<T = null> =
   | { ok: true; data: T }
   | { ok: false; error: string };
+
+export interface OwnAnswer {
+  name: string;
+  comment: string;
+  marks: Record<string, Mark>;
+}
+
+export interface AdminParticipant {
+  id: string;
+  name: string;
+  comment: string;
+  marks: Record<string, Mark>;
+}
 
 const INVALID_INPUT = "入力内容が正しくありません";
 const OPERATION_FAILED = "操作を実行できませんでした";
@@ -264,6 +281,94 @@ export async function updateAnswer(input: unknown): Promise<ActionResult> {
 
   revalidatePath(eventPath(slug));
   return { ok: true, data: null };
+}
+
+export async function getOwnAnswer(
+  input: unknown,
+): Promise<ActionResult<OwnAnswer>> {
+  const parsed = getOwnAnswerSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: INVALID_INPUT };
+  }
+  const { slug, participantId, editToken } = parsed.data;
+
+  if (!(await checkRateLimit(READ_TOKEN_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
+
+  try {
+    const event = await db.query.events.findFirst({
+      where: eq(events.slug, slug),
+    });
+    if (!event) {
+      return { ok: false, error: OPERATION_FAILED };
+    }
+
+    const participant = await db.query.participants.findFirst({
+      where: and(
+        eq(participants.id, participantId),
+        eq(participants.eventId, event.id),
+      ),
+      with: { answers: true },
+    });
+    if (!participant || !verifyToken(editToken, participant.editToken)) {
+      return { ok: false, error: OPERATION_FAILED };
+    }
+
+    return {
+      ok: true,
+      data: {
+        name: participant.name,
+        comment: participant.comment,
+        marks: Object.fromEntries(
+          participant.answers.map((answer) => [answer.slotId, answer.mark]),
+        ),
+      },
+    };
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
+}
+
+export async function getAdminParticipants(
+  input: unknown,
+): Promise<ActionResult<AdminParticipant[]>> {
+  const parsed = getAdminParticipantsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: INVALID_INPUT };
+  }
+  const { slug, adminToken } = parsed.data;
+
+  if (!(await checkRateLimit(READ_TOKEN_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
+
+  try {
+    const event = await findAdminEvent(slug, adminToken);
+    if (!event) {
+      return { ok: false, error: OPERATION_FAILED };
+    }
+
+    const rows = await db.query.participants.findMany({
+      where: eq(participants.eventId, event.id),
+      with: { answers: true },
+    });
+    return {
+      ok: true,
+      data: rows
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .map((participant) => ({
+          id: participant.id,
+          name: participant.name,
+          comment: participant.comment,
+          marks: Object.fromEntries(
+            participant.answers.map((answer) => [answer.slotId, answer.mark]),
+          ),
+        })),
+    };
+  } catch {
+    return { ok: false, error: OPERATION_FAILED };
+  }
 }
 
 export async function closeEvent(input: unknown): Promise<ActionResult> {

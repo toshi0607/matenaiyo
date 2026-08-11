@@ -5,7 +5,7 @@
 ## 決定事項
 
 - 新規リポジトリ(本リポジトリ)で開発する
-- DB + リアルタイムは **Supabase**(Postgres + Realtime)を使う
+- DB は **Supabase**(Postgres)を使う
 - ツールチェーンは ra-calc と同一: Next.js 16 / React 19 / TypeScript / pnpm / Biome / Vitest / Playwright
 
 ## コンセプト
@@ -38,7 +38,7 @@
 |---|---|---|
 | フレームワーク | Next.js 16 (App Router) + React 19 | RSCで参照系がシンプルに |
 | UI | Tailwind CSS v4 + shadcn/ui | カレンダーは shadcn Calendar(react-day-picker) |
-| DB + リアルタイム | Supabase(Postgres + Realtime) | 無料枠で運用可、リアルタイム購読が追加インフラ不要 |
+| DB | Supabase(Postgres) | 無料枠で運用可 |
 | ORM | Drizzle | 型安全・軽量 |
 | バリデーション | Zod | Server Actions の入力検証 |
 | ID生成 | nanoid | slug と各種トークン |
@@ -88,7 +88,7 @@ answers
 |---|---|
 | `/` | LP + 即作成フォーム(タイトル入力 → そのまま作成フローへ) |
 | `/new` | 作成ウィザード: ①タイトル・メモ → ②カレンダーで候補日選択 + 時刻 → ③URL発行・コピー・LINE共有 |
-| `/e/[slug]` | イベントページ。RSCで集計表を描画し、client component が Realtime 購読 |
+| `/e/[slug]` | イベントページ。RSCで集計表を描画し、client component が約5秒ごとに更新 |
 | `/e/[slug]/answer` | 回答フォーム。モバイルは候補日を1枚ずつカードで表示し ○/△/× をタップ |
 | `/e/[slug]/admin` | 幹事管理(admin_token 保持時のみ)。締切・日程確定・候補日程の追加/削除・行削除 |
 
@@ -108,9 +108,9 @@ UI詳細:
   追加は既存候補と重複しないものだけを末尾(sort_order = 最大 + 1)に足し、合計 50 件を上限とする。
   削除は候補が1件のときは拒否し、確定中の候補なら decided_slot を解除する(回答は answers の CASCADE で消える)
 
-書き込み後は Supabase Realtime の postgres_changes が全クライアントに届き、
-購読側は `router.refresh()` で RSC を再取得(クライアント側で差分マージせず、
-サーバーを真実の源にする)。
+集計ページは約5秒間隔で `router.refresh()` を実行して RSC を再取得する。
+ブラウザは Supabase の公開テーブルへ直接接続せず、クライアント側で差分マージもせず、
+サーバーを真実の源にする。
 
 ## 非機能要件
 
@@ -122,7 +122,7 @@ UI詳細:
 ## 実装フェーズ
 
 1. **Phase 1 (MVP)**: スキーマ + 作成 → 共有 → 回答 → 集計表。更新はポーリングで可
-2. **Phase 2 (体験差別化)**: カレンダー選択UI、Realtime、モバイル回答カード、ダークモード
+2. **Phase 2 (体験差別化)**: カレンダー選択UI、集計の自動更新、モバイル回答カード、ダークモード
 3. **Phase 3 (仕上げ)**: 日程確定 + .ics/Google カレンダー連携、OGP画像、LINE共有、自動削除 cron
 
 ## テスト戦略

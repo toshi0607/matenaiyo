@@ -5,12 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { slotLabel } from "@/lib/slot-label";
-import { type SlotAnswer, tallySlots } from "@/lib/tally";
-import {
-  AdminPanel,
-  type AdminParticipant,
-  type AdminSlot,
-} from "./admin-panel";
+import { AdminPanel, type AdminSlot } from "./admin-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +20,6 @@ export default async function AdminPage({
     where: eq(events.slug, slug),
     with: {
       slots: true,
-      participants: { with: { answers: true } },
     },
   });
 
@@ -36,43 +30,10 @@ export default async function AdminPage({
   const orderedSlots = [...event.slots].sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
-  const allAnswers: SlotAnswer[] = event.participants.flatMap((participant) =>
-    participant.answers.map((answer) => ({
-      slotId: answer.slotId,
-      mark: answer.mark,
-    })),
-  );
-  const tallyBySlot = new Map(
-    tallySlots(
-      orderedSlots.map((slot) => slot.id),
-      allAnswers,
-    ).map((tally) => [tally.slotId, tally]),
-  );
-
-  const slots: AdminSlot[] = orderedSlots.map((slot) => {
-    const tally = tallyBySlot.get(slot.id);
-    const yes = tally?.yes ?? 0;
-    const maybe = tally?.maybe ?? 0;
-    const no = tally?.no ?? 0;
-    return {
-      id: slot.id,
-      label: slotLabel(slot),
-      yes,
-      maybe,
-      no,
-      // あとから追加した候補は回答者がいても回答が付かないため、未回答数を明示する。
-      unanswered: event.participants.length - (yes + maybe + no),
-      isBest: tally?.isBest ?? false,
-    };
-  });
-
-  const participants: AdminParticipant[] = [...event.participants]
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    .map((participant) => ({
-      id: participant.id,
-      name: participant.name,
-      comment: participant.comment,
-    }));
+  const slots: AdminSlot[] = orderedSlots.map((slot) => ({
+    id: slot.id,
+    label: slotLabel(slot),
+  }));
 
   return (
     <main className="flex flex-1 flex-col items-center bg-background px-4 py-10">
@@ -93,7 +54,6 @@ export default async function AdminPage({
           closed={event.status === "closed"}
           decidedSlotId={event.decidedSlotId}
           slots={slots}
-          participants={participants}
         />
       </div>
     </main>

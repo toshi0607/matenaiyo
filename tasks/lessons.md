@@ -20,3 +20,11 @@
 - subagent 完了後に自分がファイルを編集する場合、別エージェントがまだ生きている可能性があるなら編集を保留するか、完了後に git status で巻き戻りを検証する
 
 **適用**: 委譲 → 検証 → ドキュメント更新の流れでは、最後に必ず `git status` / 該当箇所 grep で最終状態を確認してから完了報告する。
+
+## 認証付き read の導入時は失敗状態を既存 UX と照合する
+
+**状況**: 公開 RSC payload から機密データを除き、capability token 検証付き Server Action へ移した際、失効 credential の read 失敗がそのまま破壊的なエラー表示になり、従来の新規回答フォールバックを失った。admin 側でも取得失敗を空データとして扱い、矛盾した空状態を表示した。
+
+**教訓**: 認証境界を強化するときは、成功時の情報漏えい防止だけでなく `loading / unauthorized-or-missing / transient-error / loaded-empty` の各 UI 状態を列挙し、移行前の回復導線を維持する。mutation の成否と、その後の read refresh の成否も別状態として扱う。
+
+**適用**: private read を Action 化する変更には、失効 credential からの自己復旧、取得失敗時に空状態を断定しない表示、再試行、DB アクセス前の rate limit を機械的に検証する unit/E2E を同じ PR に含める。
