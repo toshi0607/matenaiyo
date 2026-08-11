@@ -372,3 +372,28 @@ reviewer subagent(新規コンテキスト)による Phase 1 レビュー: **承
 - 最新 `origin/main` へのリベース後に、`git diff --check`、Supabase 境界の残存検索、`pnpm check`、`pnpm test`（85 tests）、`pnpm build`、focused E2E、全 E2E（17 tests）がすべて成功した。
 - 独立 reviewer は認可・回帰・競合を再確認し、actionable finding なしで承認した。
 - 残存前提: localStorage token は端末内 bearer capability。誤/クロスイベント token、実 Upstash、非表示タブの専用テストは将来の追加余地として残る。
+
+## PR #26 レビュー対応（2026-08-11）
+
+- [x] 無効な edit credential を新規回答モードへ静かにフォールバックさせ、回帰 E2E を追加する
+- [x] token 検証付き read action に IP ベースのレート制限とテストを追加する
+- [x] admin の参加者取得状態を loading/error/loaded で区別し、再試行導線を追加する
+- [x] mutation 成功と、その後の一覧再取得失敗を別メッセージとして扱う
+- [x] answer form の再取得依存を slot ID の安定キーへ変更する
+- [x] `pnpm check` / `pnpm test` / `pnpm build` / 全 E2E を通し、独立レビューを実施する
+
+### 設計判断
+
+- read action の rate-limit 超過は既存の `RATE_LIMITED` を返し、DB アクセス前に拒否する。
+- admin の参加者データ取得失敗は mutation の成否とは独立した表示状態にし、成功するまで空回答の断定や集計を表示しない。
+- 回答フォームは slot ID の集合が変わったときだけ所有回答を再取得し、同一内容の配列再生成では入力を上書きしない。
+- 一時的な read 失敗でも新規回答へフォールバックすると重複回答の余地があるが、レビュー受け入れ条件が通信障害を含む失敗時の継続入力を明示しているため採用する。既存 credential は削除せず、新規回答の保存成功時に上書きする。
+
+### レビュー結果
+
+- 削除済み参加者がエラーなし・既定マーク付きの新規回答フォームへ復帰し、再送信できる E2E を追加した。正常な再編集導線も同じ spec で維持を確認した。
+- `getOwnAnswer` / `getAdminParticipants` は `READ_TOKEN_LIMIT` を DB アクセス前に適用し、制限超過時に DB query が呼ばれない action 単体テストを追加した。
+- 壊れた admin token で空回答コピー・集計・削除カードを表示せず、保存済み token の復旧後に再読み込みボタンで正常表示へ戻る E2E を追加した。
+- mutation のエラーと回答一覧再取得のエラーを別 state・別メッセージに分離し、再取得失敗後も `router.refresh()` を継続する。
+- `git diff --check`、`pnpm check`、`pnpm test`（88 tests）、`pnpm build`、`pnpm exec playwright test`（18 tests）がすべて成功した。
+- 独立 reviewer は上記フォールバックの重複回答リスクを指摘した。これは明示された受け入れ条件とのトレードオフとして記録し、残り4件は actionable finding なしと確認した。

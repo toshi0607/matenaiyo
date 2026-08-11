@@ -41,8 +41,8 @@ const MARK_ACTIVE: Record<Mark, string> = {
 /** slotId -> 出欠。未選択(再編集時にまだ答えていない候補)は undefined。 */
 type MarkSelection = Record<string, Mark | undefined>;
 
-function buildDefaultMarks(slots: SlotView[]): MarkSelection {
-  return Object.fromEntries(slots.map((slot) => [slot.id, DEFAULT_MARK]));
+function buildDefaultMarks(slotIds: string[]): MarkSelection {
+  return Object.fromEntries(slotIds.map((slotId) => [slotId, DEFAULT_MARK]));
 }
 
 export function AnswerForm({
@@ -69,15 +69,25 @@ export function AnswerForm({
   const [done, setDone] = useState(false);
   const [loadingOwnAnswer, setLoadingOwnAnswer] = useState(true);
   const [pending, startTransition] = useTransition();
+  // 親の再描画で slots 配列が作り直されても、同じ候補なら既存回答を読み直さない。
+  const slotIdsKey = JSON.stringify(slots.map((slot) => slot.id));
 
   // localStorage の編集能力を使って、既存の自分の回答だけを読み込む。
   useEffect(() => {
+    const slotIds = JSON.parse(slotIdsKey) as string[];
+    const applyNewAnswerDefaults = () => {
+      defaultsApplied.current = true;
+      setEditCredential(null);
+      setName("");
+      setComment("");
+      setMarks(buildDefaultMarks(slotIds));
+      setError(null);
+    };
     const credential = loadEditCredential(slug);
     if (!credential) {
       // 入力途中の選択を消さないよう、既定値の適用は一度だけ。
       if (!defaultsApplied.current) {
-        defaultsApplied.current = true;
-        setMarks(buildDefaultMarks(slots));
+        applyNewAnswerDefaults();
       }
       setLoadingOwnAnswer(false);
       return;
@@ -85,31 +95,39 @@ export function AnswerForm({
     let cancelled = false;
 
     startTransition(async () => {
-      const result = await getOwnAnswer({ slug, ...credential });
-      if (cancelled) return;
-      setLoadingOwnAnswer(false);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setEditCredential(credential);
-      setName(result.data.name);
-      setComment(result.data.comment);
-      // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
-      // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
-      setMarks(() => {
-        const next: MarkSelection = {};
-        for (const slot of slots) {
-          next[slot.id] = result.data.marks[slot.id];
+      try {
+        const result = await getOwnAnswer({ slug, ...credential });
+        if (cancelled) return;
+        setLoadingOwnAnswer(false);
+        if (!result.ok) {
+          // 削除済み・失効済みの能力と一時的な通信失敗は区別できない。
+          // localStorage は残しつつ、新規回答として続けられるようにする。
+          applyNewAnswerDefaults();
+          return;
         }
-        return next;
-      });
+        setEditCredential(credential);
+        setName(result.data.name);
+        setComment(result.data.comment);
+        // 自分が回答したあとに幹事が追加した候補は未選択のままにする。
+        // 既定値を入れてしまうと「見ていない候補」が「未定と答えた」ことになる。
+        setMarks(() => {
+          const next: MarkSelection = {};
+          for (const slotId of slotIds) {
+            next[slotId] = result.data.marks[slotId];
+          }
+          return next;
+        });
+      } catch {
+        if (cancelled) return;
+        setLoadingOwnAnswer(false);
+        applyNewAnswerDefaults();
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [slug, slots]);
+  }, [slug, slotIdsKey]);
 
   function setMark(slotId: string, mark: Mark) {
     setMarks((prev) => ({ ...prev, [slotId]: mark }));

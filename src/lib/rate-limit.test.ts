@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { ANSWER_LIMIT, checkRateLimit } from "./rate-limit";
+import { ANSWER_LIMIT, checkRateLimit, READ_TOKEN_LIMIT } from "./rate-limit";
 
 const redisEnvironmentVariables = [
   "UPSTASH_REDIS_REST_URL",
@@ -26,6 +26,14 @@ afterEach(() => {
 });
 
 describe("checkRateLimit without Upstash configuration", () => {
+  it("defines the read-token rule", () => {
+    expect(READ_TOKEN_LIMIT).toEqual({
+      name: "read-token",
+      limit: 60,
+      window: "10 m",
+    });
+  });
+
   it.each(redisEnvironmentVariables)(
     "rejects requests in production when %s is absent",
     async (missingVariable) => {

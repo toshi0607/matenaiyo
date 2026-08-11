@@ -217,3 +217,50 @@ test("non-admin device sees no admin link and a not-recognized notice", async ({
 
   await otherContext.close();
 });
+
+test("admin can retry a failed participant-list load after restoring its token", async ({
+  page,
+}) => {
+  await page.goto("/new?title=管理一覧再読込テスト");
+  await selectCurrentMonthDays(page, [15]);
+  await page.getByTestId("create-submit").click();
+  const shareUrl = await page.getByTestId("share-url").inputValue();
+  const slug = shareUrl.split("/e/")[1];
+  expect(slug).toBeTruthy();
+
+  await page.goto(`/e/${slug}/answer`);
+  await page.getByTestId("answer-name").fill("幹事");
+  await page.getByTestId("answer-slot").first().getByTestId("mark-yes").click();
+  await page.getByTestId("answer-submit").click();
+  await expect(page.getByTestId("answer-done")).toBeVisible();
+
+  const adminStorageKey = `chosei:admin:${slug}`;
+  const validAdminToken = await page.evaluate((key) => {
+    return window.localStorage.getItem(key);
+  }, adminStorageKey);
+  expect(validAdminToken).toBeTruthy();
+  if (!validAdminToken) {
+    throw new Error("Expected an admin token after creating the event");
+  }
+  await page.evaluate((key) => {
+    window.localStorage.setItem(key, "corrupt-token");
+  }, adminStorageKey);
+
+  await page.goto(`/e/${slug}/admin`);
+  await expect(page.getByTestId("admin-participants-load-error")).toBeVisible();
+  await expect(page.getByText("まだ回答がありません。")).toHaveCount(0);
+  await expect(page.getByTestId("slot-tally")).toHaveCount(0);
+  await expect(page.getByTestId("admin-best-badge")).toHaveCount(0);
+  await expect(page.getByText("参加者を削除する")).toHaveCount(0);
+
+  await page.evaluate(
+    ({ key, token }) => window.localStorage.setItem(key, token),
+    { key: adminStorageKey, token: validAdminToken },
+  );
+  await page.getByTestId("retry-participants-load").click();
+  await expect(page.getByTestId("admin-participants-load-error")).toHaveCount(
+    0,
+  );
+  await expect(page.getByTestId("slot-tally")).toContainText("○ 1");
+  await expect(page.getByTestId("admin-best-badge")).toBeVisible();
+});

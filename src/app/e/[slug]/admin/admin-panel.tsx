@@ -50,6 +50,8 @@ interface AdminError {
   message: string;
 }
 
+type ParticipantsLoadState = "loading" | "loaded" | "error";
+
 interface RunOptions {
   onSuccess?: () => void;
   scope?: ErrorScope;
@@ -69,6 +71,11 @@ export function AdminPanel({
   const router = useRouter();
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [participants, setParticipants] = useState<AdminParticipant[]>([]);
+  const [participantsLoadState, setParticipantsLoadState] =
+    useState<ParticipantsLoadState>("loading");
+  const [participantsLoadError, setParticipantsLoadError] = useState<
+    string | null
+  >(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<AdminError | null>(null);
   // 実行中の操作の種類。進行中コピーを実際に押した操作にだけ出すために持つ。
@@ -80,13 +87,32 @@ export function AdminPanel({
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
 
   const refreshParticipants = useCallback(
-    async (token: string) => {
-      const result = await getAdminParticipants({ slug, adminToken: token });
-      if (!result.ok) {
-        setError({ scope: "global", message: result.error });
-        return;
+    async (token: string, operationCompleted = false): Promise<boolean> => {
+      setParticipantsLoadState("loading");
+      setParticipantsLoadError(null);
+      try {
+        const result = await getAdminParticipants({ slug, adminToken: token });
+        if (!result.ok) {
+          setParticipantsLoadState("error");
+          setParticipantsLoadError(
+            operationCompleted
+              ? "操作は完了しましたが、回答一覧の再読み込みに失敗しました。"
+              : "回答一覧を読み込めませんでした。",
+          );
+          return false;
+        }
+        setParticipants(result.data);
+        setParticipantsLoadState("loaded");
+        return true;
+      } catch {
+        setParticipantsLoadState("error");
+        setParticipantsLoadError(
+          operationCompleted
+            ? "操作は完了しましたが、回答一覧の再読み込みに失敗しました。"
+            : "回答一覧を読み込めませんでした。",
+        );
+        return false;
       }
-      setParticipants(result.data);
     },
     [slug],
   );
@@ -101,6 +127,15 @@ export function AdminPanel({
       });
     }
   }, [slug, refreshParticipants]);
+
+  function retryParticipantsLoad() {
+    const token = loadAdminToken(slug);
+    setAdminToken(token);
+    if (!token) return;
+    startTransition(async () => {
+      await refreshParticipants(token);
+    });
+  }
 
   function run(
     action: () => Promise<{ ok: boolean; error?: string }>,
@@ -120,7 +155,7 @@ export function AdminPanel({
       }
       onSuccess?.();
       if (adminToken) {
-        await refreshParticipants(adminToken);
+        await refreshParticipants(adminToken, true);
       }
       router.refresh();
     });
@@ -146,7 +181,8 @@ export function AdminPanel({
   const remainingSlots = MAX_SLOTS_PER_EVENT - slots.length;
   const selectedCount = picker.slotInputs.length;
   const isOnlySlot = slots.length <= 1;
-  const hasAnswers = participants.length > 0;
+  const participantsLoaded = participantsLoadState === "loaded";
+  const hasAnswers = participantsLoaded && participants.length > 0;
   const tallyBySlot = new Map(
     tallySlots(
       slots.map((slot) => slot.id),
@@ -168,8 +204,10 @@ export function AdminPanel({
       yes,
       maybe,
       no,
-      unanswered: participants.length - (yes + maybe + no),
-      isBest: tally?.isBest ?? false,
+      unanswered: participantsLoaded
+        ? participants.length - (yes + maybe + no)
+        : 0,
+      isBest: participantsLoaded && (tally?.isBest ?? false),
     };
   });
 
@@ -214,9 +252,11 @@ export function AdminPanel({
         <CardHeader>
           <CardTitle>候補日程</CardTitle>
           <CardDescription>
-            {hasAnswers ? (
+            {participantsLoadState === "loading" ? (
+              "回答一覧を読み込んでいます…"
+            ) : hasAnswers ? (
               "各候補の集計(○参加 / △未定 / ×不参加)を見ながら日程を確定できます。○が最多の候補に「ベスト」が付きます。"
-            ) : (
+            ) : participantsLoadState === "loaded" ? (
               <>
                 まだ回答がありません。
                 <Link
@@ -228,8 +268,27 @@ export function AdminPanel({
                 </Link>
                 をメンバーに送ってください。
               </>
-            )}
+            ) : null}
           </CardDescription>
+          {participantsLoadState === "error" ? (
+            <div
+              className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm"
+              role="status"
+              data-testid="admin-participants-load-error"
+            >
+              <span>{participantsLoadError}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={retryParticipantsLoad}
+                data-testid="retry-participants-load"
+              >
+                再読み込み
+              </Button>
+            </div>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
           {slotsWithTallies.map((slot) => {

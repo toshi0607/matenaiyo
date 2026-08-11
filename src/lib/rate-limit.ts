@@ -20,6 +20,11 @@ export const ANSWER_LIMIT: RateLimitRule = {
   limit: 30,
   window: "10 m",
 };
+export const READ_TOKEN_LIMIT: RateLimitRule = {
+  name: "read-token",
+  limit: 60,
+  window: "10 m",
+};
 
 let cachedRedis: Redis | null | undefined;
 

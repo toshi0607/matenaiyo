@@ -9,6 +9,7 @@ import {
   CREATE_EVENT_LIMIT,
   checkRateLimit,
   clientIdentifier,
+  READ_TOKEN_LIMIT,
 } from "@/lib/rate-limit";
 import type { Mark } from "@/lib/schemas";
 import {
@@ -291,6 +292,10 @@ export async function getOwnAnswer(
   }
   const { slug, participantId, editToken } = parsed.data;
 
+  if (!(await checkRateLimit(READ_TOKEN_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
+
   try {
     const event = await db.query.events.findFirst({
       where: eq(events.slug, slug),
@@ -333,6 +338,10 @@ export async function getAdminParticipants(
     return { ok: false, error: INVALID_INPUT };
   }
   const { slug, adminToken } = parsed.data;
+
+  if (!(await checkRateLimit(READ_TOKEN_LIMIT, await clientIdentifier()))) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   try {
     const event = await findAdminEvent(slug, adminToken);

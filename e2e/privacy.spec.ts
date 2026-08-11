@@ -53,6 +53,21 @@ test("participant comments are absent from unauthenticated answer data", async (
     .click();
   await expect(organizerPage.getByText(sentinelComment)).toHaveCount(0);
 
+  // Deleted credentials are indistinguishable from transient read failures.
+  // The stored credential stays in place, but the participant can answer anew.
+  await participantPage.goto(`/e/${slug}/answer`);
+  await expect(participantPage.getByTestId("answer-error")).toHaveCount(0);
+  await expect(participantPage.getByTestId("answer-name")).toHaveValue("");
+  await expect(
+    participantPage
+      .getByTestId("answer-slot")
+      .first()
+      .getByTestId("mark-maybe"),
+  ).toHaveAttribute("data-active", "true");
+  await participantPage.getByTestId("answer-name").fill("回答し直し");
+  await participantPage.getByTestId("answer-submit").click();
+  await expect(participantPage.getByTestId("answer-done")).toBeVisible();
+
   await participantContext.close();
   await visitorContext.close();
   await adminVisitorContext.close();
