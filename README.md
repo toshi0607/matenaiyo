@@ -110,8 +110,7 @@ Supabase Free プランはアクティビティがない状態が7日間続く�
 
 ### 仕組み
 
-1. **psql でのテーブル初期化と古いレコード削除** — 直接 Postgres 接続でテーブルを確保し、30日以上前のレコードを削除してストレージを節約
-2. **REST API 経由のレコード挿入** — Supabase REST API 経由で keepalive テーブルにレコードを挿入。直接接続ではなく REST API 経由にすることで、確実にアクティビティがカウントされる
+psql で直接 Postgres 接続(pooler 経由)し、`keepalive` テーブルの確保(`CREATE TABLE IF NOT EXISTS`)、30日以上前のレコード削除、レコード1件の INSERT を1ステップで実行します。本プロジェクトは Data API (PostgREST) を無効にしているため REST API 経由は使わず、直接接続の DB アクティビティで keepalive します。万一これがアクティビティとしてカウントされない場合も、停止の約1週間前に Supabase から警告メールが届くため検知できます。
 
 ### 必要な GitHub シークレット
 
@@ -119,9 +118,7 @@ Supabase Free プランはアクティビティがない状態が7日間続く�
 
 | シークレット | 説明 |
 |---|---|
-| `DATABASE_URL` | Supabase のコネクションプーラ(pooler)経由の Postgres 接続文字列。GitHub Actions ランナーが IPv4 のみのため、IPv6 オンリーの直接接続ホストではなく pooler を使う |
-| `SUPABASE_URL` | Supabase プロジェクトの URL (例: `https://xxxxx.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase の Service Role キー(管理者権限) |
+| `DATABASE_URL` | Supabase のコネクションプーラ(shared pooler)経由の Postgres 接続文字列。GitHub Actions ランナーが IPv4 のみのため、IPv6 オンリーの直接接続ホストではなく pooler を使う(Vercel に設定済みの値と同じでよい) |
 
 ### 手動実行
 

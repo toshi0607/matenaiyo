@@ -20,12 +20,15 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
-      - name: Ensure keepalive table and prune old rows
-        # GitHub Actions ランナーは IPv4 のみで db.*.supabase.co 直接続ホストは IPv6 のみのため、pooler 経由の DATABASE_URL を使うこと
+      - name: Insert keepalive record and prune old rows
+        # このプロジェクトは Data API (PostgREST) を無効にしているため REST 経由は使えず、
+        # 直接 Postgres 接続(pooler 経由)での INSERT をアクティビティとして期待する。
+        # 万一カウントされない場合も、停止の約1週間前に Supabase から警告メールが届くため検知できる。
+        # GitHub Actions ランナーは IPv4 のみのため、IPv4 の A レコードを持つ shared pooler 経由の
+        # DATABASE_URL を使うこと(db.*.supabase.co 直接続ホストは IPv6 のみ)。
+        # RLS は将来 Data API を有効化した場合の防御として有効にしておく(ポリシーなし = API から読み書き不可)。
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'SQL'
           CREATE TABLE IF NOT EXISTS public.keepalive (
@@ -35,19 +38,5 @@ jobs:
           );
           ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
           DELETE FROM public.keepalive WHERE created_at < now() - interval '30 days';
-          NOTIFY pgrst, 'reload schema';
+          INSERT INTO public.keepalive (source) VALUES ('github-actions');
           SQL
-
-      - name: Insert keepalive record via REST API
-        # 直接 Postgres 接続がアクティビティに数えられるかは公式に曖昧なので、確実にカウントされる REST API 経由で INSERT する
-        # PostgREST のスキーマキャッシュ更新は NOTIFY 後に非同期で行われるため、テーブル初回作成直後は
-        # 404 (PGRST205) になりうる。--retry-all-errors で 5秒間隔・最大5回リトライして反映を待つ
-        # (計6試行で成功しなければ失敗させる。リトライで INSERT が重複しても keepalive 用途では許容)
-        run: |
-          curl --fail-with-body -sS -X POST "${SUPABASE_URL}/rest/v1/keepalive" \
-            --retry 5 --retry-delay 5 --retry-all-errors \
-            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            -d '{"source":"github-actions"}'
