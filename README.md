@@ -103,3 +103,30 @@ pnpm dev
 ## CI
 
 `.github/workflows/ci.yml` にて、`pnpm check` → `pnpm test` → `pnpm build` → `pnpm db:migrate` → `pnpm test:e2e` をPostgresサービスコンテナ上で実行しています。
+
+## Supabase Keepalive
+
+Supabase Free プランはアクティビティがない状態が7日間続くと、データベースが自動的に一時停止されます。本番環境の停止を防ぐため、`.github/workflows/supabase-keepalive.yml` で週2回(月曜・木曜の12:00 JST)自動的にデータベースアクセスを実行しています。
+
+### 仕組み
+
+1. **psql でのテーブル初期化と古いレコード削除** — 直接 Postgres 接続でテーブルを確保し、30日以上前のレコードを削除してストレージを節約
+2. **REST API 経由のレコード挿入** — Supabase REST API 経由で keepalive テーブルにレコードを挿入。直接接続ではなく REST API 経由にすることで、確実にアクティビティがカウントされる
+
+### 必要な GitHub シークレット
+
+以下の環境変数を GitHub リポジトリの **Settings** > **Secrets and variables** > **Repository secrets** に設定してください。
+
+| シークレット | 説明 |
+|---|---|
+| `DATABASE_URL` | Supabase のコネクションプーラ(pooler)経由の Postgres 接続文字列。GitHub Actions ランナーが IPv4 のみのため、IPv6 オンリーの直接接続ホストではなく pooler を使う |
+| `SUPABASE_URL` | Supabase プロジェクトの URL (例: `https://xxxxx.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase の Service Role キー(管理者権限) |
+
+### 手動実行
+
+GitHub Actions の UI から **Supabase Keepalive** ワークフローの **Run workflow** ボタンで手動実行できます。
+
+### 注意事項
+
+- **public リポジトリの scheduled workflow の自動無効化**: GitHub は public リポジトリで60日間コミットがないと、schedule トリガーのワークフローを自動無効化します。本番環境で重要な場合は定期的にコミットを行うか、ワークフローが無効化されていないか定期的に確認してください

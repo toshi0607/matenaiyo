@@ -1,0 +1,49 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Supabase Free プランは7日間の低アクティビティで一時停止されるため週2回動かす
+    # Mon/Thu 03:00 UTC = 12:00 JST
+    # 注意: public リポジトリは60日間コミットがないと scheduled workflow が自動無効化される
+    - cron: "0 3 * * 1,4"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: supabase-keepalive
+      cancel-in-progress: false
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Ensure keepalive table and prune old rows
+        # GitHub Actions ランナーは IPv4 のみで db.*.supabase.co 直接続ホストは IPv6 のみのため、pooler 経由の DATABASE_URL を使うこと
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'SQL'
+          CREATE TABLE IF NOT EXISTS public.keepalive (
+            id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            source text NOT NULL DEFAULT 'github-actions',
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+          ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+          DELETE FROM public.keepalive WHERE created_at < now() - interval '30 days';
+          NOTIFY pgrst, 'reload schema';
+          SQL
+
+      - name: Insert keepalive record via REST API
+        # 直接 Postgres 接続がアクティビティに数えられるかは公式に曖昧なので、確実にカウントされる REST API 経由で INSERT する
+        run: |
+          curl --fail-with-body -sS -X POST "${SUPABASE_URL}/rest/v1/keepalive" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d '{"source":"github-actions"}'
