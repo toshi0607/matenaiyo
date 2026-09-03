@@ -1,0 +1,42 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Supabase Free プランは7日間の低アクティビティで一時停止されるため週2回動かす
+    # Mon/Thu 03:00 UTC = 12:00 JST
+    # 注意: public リポジトリは60日間コミットがないと scheduled workflow が自動無効化される
+    - cron: "0 3 * * 1,4"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: supabase-keepalive
+      cancel-in-progress: false
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Insert keepalive record and prune old rows
+        # このプロジェクトは Data API (PostgREST) を無効にしているため REST 経由は使えず、
+        # 直接 Postgres 接続(pooler 経由)での INSERT をアクティビティとして期待する。
+        # 万一カウントされない場合も、停止の約1週間前に Supabase から警告メールが届くため検知できる。
+        # GitHub Actions ランナーは IPv4 のみのため、IPv4 の A レコードを持つ shared pooler 経由の
+        # DATABASE_URL を使うこと(db.*.supabase.co 直接続ホストは IPv6 のみ)。
+        # RLS は将来 Data API を有効化した場合の防御として有効にしておく(ポリシーなし = API から読み書き不可)。
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'SQL'
+          CREATE TABLE IF NOT EXISTS public.keepalive (
+            id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            source text NOT NULL DEFAULT 'github-actions',
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+          ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+          DELETE FROM public.keepalive WHERE created_at < now() - interval '30 days';
+          INSERT INTO public.keepalive (source) VALUES ('github-actions');
+          SQL
