@@ -1,0 +1,66 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Supabase Free プランは7日間の低アクティビティで一時停止されるため週2回動かす
+    # Mon/Thu 03:00 UTC = 12:00 JST
+    # 注意: public リポジトリは60日間コミットがないと scheduled workflow が自動無効化される
+    - cron: "0 3 * * 1,4"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: supabase-keepalive
+      cancel-in-progress: false
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Validate DATABASE_URL
+        # psql は引数が postgresql:// で始まる場合のみ接続 URI として扱い、そうでなければ DB 名と解釈して
+        # ローカルソケットに接続しようとする。secret の貼り付けミス(引用符・空白・改行の混入)を
+        # 分かりやすく検出するため、値自体はログに出さずに形式だけ検証する。
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is empty"
+            exit 1
+          fi
+          case "$DATABASE_URL" in
+            postgresql://*|postgres://*)
+              echo "DATABASE_URL format OK (length ${#DATABASE_URL})"
+              ;;
+            *)
+              case "${DATABASE_URL:0:1}" in
+                '"'|"'") kind="quote" ;;
+                ' '|$'\t'|$'\n'|$'\r') kind="whitespace" ;;
+                *) kind="other" ;;
+              esac
+              echo "::error::DATABASE_URL must start with postgresql:// (length ${#DATABASE_URL}, first char: ${kind})"
+              exit 1
+              ;;
+          esac
+
+      - name: Insert keepalive record and prune old rows
+        # このプロジェクトは Data API (PostgREST) を無効にしているため REST 経由は使えず、
+        # 直接 Postgres 接続(pooler 経由)での INSERT をアクティビティとして期待する。
+        # 万一カウントされない場合も、停止の約1週間前に Supabase から警告メールが届くため検知できる。
+        # GitHub Actions ランナーは IPv4 のみのため、IPv4 の A レコードを持つ shared pooler 経由の
+        # DATABASE_URL を使うこと(db.*.supabase.co 直接続ホストは IPv6 のみ)。
+        # RLS は将来 Data API を有効化した場合の防御として有効にしておく(ポリシーなし = API から読み書き不可)。
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 << 'SQL'
+          CREATE TABLE IF NOT EXISTS public.keepalive (
+            id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            source text NOT NULL DEFAULT 'github-actions',
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+          ALTER TABLE public.keepalive ENABLE ROW LEVEL SECURITY;
+          DELETE FROM public.keepalive WHERE created_at < now() - interval '30 days';
+          INSERT INTO public.keepalive (source) VALUES ('github-actions');
+          SQL
