@@ -5,12 +5,14 @@
 ## スコープ
 
 ### A. 幹事管理・日程確定・カレンダー連携
+
 - [x] `/e/[slug]/admin` 幹事管理画面(adminToken 保持時のみ操作可)。締切・日程確定・行削除。未保持端末は not-recognized 案内
 - [x] イベントページに「幹事管理」導線(localStorage に adminToken がある端末のみ表示)
 - [x] 日程確定後、確定バナー + `.ics` ダウンロード + Google カレンダー追加リンク(starts_at がある場合のみ連携ボタン)
 - [x] `src/lib/calendar-export.ts`: `.ics`(RFC5545、CRLF、UTC)と Google カレンダー URL 生成 + ユニットテスト
 
 ### B. 共有・OGP・自動削除
+
 - [x] OGP画像(next/og): `/e/[slug]/opengraph-image.tsx`。Noto Sans JP サブセットで日本語描画。runtime nodejs
 - [x] LINE共有ボタン(share-url に追加、既存 testid 維持)
 - [x] 自動削除 cron: `/api/cron/cleanup`(Bearer 認証、未設定=500・不一致=401・一致時のみ削除)+ `vercel.json`(0 3 * * *)

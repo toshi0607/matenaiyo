@@ -20,17 +20,17 @@
 
 ## 技術スタック
 
-| レイヤ | 選定 |
-|---|---|
-| フレームワーク | Next.js 16 (App Router) + React 19 + TypeScript |
-| UI | Tailwind CSS v4 + shadcn/ui(カレンダーは react-day-picker) |
-| DB + リアルタイム | Supabase(Postgres + Realtime) |
-| ORM | Drizzle ORM |
-| バリデーション | Zod |
-| レート制限 | Upstash Redis(`@upstash/ratelimit`) |
-| ホスティング | Vercel(next/og、Vercel Cronによる自動削除込み) |
-| Lint / 型検査 | Biome + tsc |
-| テスト | Vitest(ユニット) / Playwright(E2E) |
+| レイヤ            | 選定                                                       |
+| ----------------- | ---------------------------------------------------------- |
+| フレームワーク    | Next.js 16 (App Router) + React 19 + TypeScript            |
+| UI                | Tailwind CSS v4 + shadcn/ui(カレンダーは react-day-picker) |
+| DB + リアルタイム | Supabase(Postgres + Realtime)                              |
+| ORM               | Drizzle ORM                                                |
+| バリデーション    | Zod                                                        |
+| レート制限        | Upstash Redis(`@upstash/ratelimit`)                        |
+| ホスティング      | Vercel(next/og、Vercel Cronによる自動削除込み)             |
+| Lint / 型検査     | Biome + tsc                                                |
+| テスト            | Vitest(ユニット) / Playwright(E2E)                         |
 
 詳細な設計は [DESIGN.md](./DESIGN.md) を参照してください。
 
@@ -58,13 +58,13 @@ docker compose up -d
 cp .env.example .env
 ```
 
-| 変数 | 用途 | 未設定時の挙動 |
-|---|---|---|
-| `DATABASE_URL` | Postgres接続文字列 | 必須 |
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 集計ページのRealtime購読 | 両方揃わない場合は約5秒間隔のポーリングにフォールバック |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 作成・回答系ActionのIPベースレート制限 | 未設定ならレート制限は無効(ローカル/CI向け) |
-| `CRON_SECRET` | `/api/cron/cleanup` の認証(Vercel Cronが自動付与) | 未設定だとエンドポイントは500を返し、誤削除を防ぐ安全側に倒す |
-| `NEXT_PUBLIC_GA_ID` | Google Analytics 4の測定ID | 未設定ならスクリプトを読み込まない |
+| 変数                                                         | 用途                                              | 未設定時の挙動                                                |
+| ------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`                                               | Postgres接続文字列                                | 必須                                                          |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 集計ページのRealtime購読                          | 両方揃わない場合は約5秒間隔のポーリングにフォールバック       |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`        | 作成・回答系ActionのIPベースレート制限            | 未設定ならレート制限は無効(ローカル/CI向け)                   |
+| `CRON_SECRET`                                                | `/api/cron/cleanup` の認証(Vercel Cronが自動付与) | 未設定だとエンドポイントは500を返し、誤削除を防ぐ安全側に倒す |
+| `NEXT_PUBLIC_GA_ID`                                          | Google Analytics 4の測定ID                        | 未設定ならスクリプトを読み込まない                            |
 
 ### 4. DBマイグレーションの適用
 
@@ -88,17 +88,17 @@ pnpm dev
 
 ## コマンド一覧
 
-| コマンド | 内容 |
-|---|---|
-| `pnpm dev` | 開発サーバーを起動 |
-| `pnpm build` | 本番ビルド |
-| `pnpm start` | 本番ビルドの起動 |
-| `pnpm check` | Biomeによるlint/format検査 + `tsc --noEmit`による型検査 |
-| `pnpm check:fix` | 上記の自動修正版 |
-| `pnpm test` | Vitestによるユニットテスト |
-| `pnpm test:e2e` | Playwrightによるe2eテスト |
-| `pnpm db:generate` | Drizzleのマイグレーションファイル生成 |
-| `pnpm db:migrate` | マイグレーションの適用 |
+| コマンド           | 内容                                                    |
+| ------------------ | ------------------------------------------------------- |
+| `pnpm dev`         | 開発サーバーを起動                                      |
+| `pnpm build`       | 本番ビルド                                              |
+| `pnpm start`       | 本番ビルドの起動                                        |
+| `pnpm check`       | Biomeによるlint/format検査 + `tsc --noEmit`による型検査 |
+| `pnpm check:fix`   | 上記の自動修正版                                        |
+| `pnpm test`        | Vitestによるユニットテスト                              |
+| `pnpm test:e2e`    | Playwrightによるe2eテスト                               |
+| `pnpm db:generate` | Drizzleのマイグレーションファイル生成                   |
+| `pnpm db:migrate`  | マイグレーションの適用                                  |
 
 ## CI
 
@@ -116,8 +116,8 @@ psql で直接 Postgres 接続(pooler 経由)し、`keepalive` テーブルの�
 
 以下の環境変数を GitHub リポジトリの **Settings** > **Secrets and variables** > **Repository secrets** に設定してください。
 
-| シークレット | 説明 |
-|---|---|
+| シークレット   | 説明                                                                                                                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL` | Supabase のコネクションプーラ(shared pooler)経由の Postgres 接続文字列。GitHub Actions ランナーが IPv4 のみのため、IPv6 オンリーの直接接続ホストではなく pooler を使う(Vercel に設定済みの値と同じでよい) |
 
 ### 手動実行
