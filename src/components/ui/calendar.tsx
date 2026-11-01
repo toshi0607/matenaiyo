@@ -137,6 +137,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        // biome-ignore lint/correctness/noComponentHookFactories: react-day-picker's components prop requires inline overrides per its documented API
         Root: ({ className, rootRef, ...props }) => {
           return (
             <div
@@ -147,6 +148,7 @@ function Calendar({
             />
           );
         },
+        // biome-ignore lint/correctness/noComponentHookFactories: react-day-picker's components prop requires inline overrides per its documented API
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === "left") {
             return (
@@ -167,9 +169,11 @@ function Calendar({
             <ChevronDownIcon className={cn("size-4", className)} {...props} />
           );
         },
+        // biome-ignore lint/correctness/noComponentHookFactories: react-day-picker's components prop requires inline overrides per its documented API
         DayButton: ({ ...props }) => (
           <CalendarDayButton locale={locale} {...props} />
         ),
+        // biome-ignore lint/correctness/noComponentHookFactories: react-day-picker's components prop requires inline overrides per its documented API
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>

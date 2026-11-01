@@ -22,15 +22,15 @@ vercel.app サブドメインはスパムサイトも多く、ドメイン単位
 
 ## 柱1: 技術 SEO 基盤(1〜2日、全施策の前提)
 
-| 項目 | 内容 |
-|---|---|
-| robots.ts | `/api/` のみ Disallow。`/e/` は Disallow **しない**(robots.txt でブロックすると noindex メタタグが読まれず、外部リンク経由で URL がインデックスされうる — Google 仕様) |
-| noindex | `/e/[slug]` 系全ページに `robots: { index: false, follow: false }`。参加者名が載る UGC ページのインデックスはプライバシー事故になる。**SEO 以前に必須** |
-| sitemap.ts | トップ + 静的コンテンツページのみ列挙(イベントページは含めない) |
-| JSON-LD | トップに `WebApplication`(name, description, offers: 無料, operatingSystem: Web)+ `FAQPage` |
-| canonical | metadataBase 済み。独自ドメイン移行時に更新 |
-| Search Console | 登録・sitemap 送信。効果計測の土台 |
-| README | テンプレのまま。GitHub もランディングの一つ(特に開発者流入)。スクショ・機能・技術スタック・デモ URL を記載 |
+| 項目           | 内容                                                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| robots.ts      | `/api/` のみ Disallow。`/e/` は Disallow **しない**(robots.txt でブロックすると noindex メタタグが読まれず、外部リンク経由で URL がインデックスされうる — Google 仕様) |
+| noindex        | `/e/[slug]` 系全ページに `robots: { index: false, follow: false }`。参加者名が載る UGC ページのインデックスはプライバシー事故になる。**SEO 以前に必須**                |
+| sitemap.ts     | トップ + 静的コンテンツページのみ列挙(イベントページは含めない)                                                                                                        |
+| JSON-LD        | トップに `WebApplication`(name, description, offers: 無料, operatingSystem: Web)+ `FAQPage`                                                                            |
+| canonical      | metadataBase 済み。独自ドメイン移行時に更新                                                                                                                            |
+| Search Console | 登録・sitemap 送信。効果計測の土台                                                                                                                                     |
+| README         | テンプレのまま。GitHub もランディングの一つ(特に開発者流入)。スクショ・機能・技術スタック・デモ URL を記載                                                             |
 
 ## 柱2: LP / コンテンツ
 
@@ -91,14 +91,14 @@ AI 検索は「新しくてもコンテンツが明瞭なら推薦されうる�
 
 ## ロードマップ
 
-| フェーズ | 期間 | 内容 | 期待効果 |
-|---|---|---|---|
-| 0 | 即決 | 独自ドメイン決定・移行 | 全資産の蓄積先確保 |
-| 1 | 1週目 | 柱1(技術SEO基盤)+ noindex + Search Console + README | 事故防止・計測開始 |
-| 2 | 1〜2週目 | 柱4(バイラルループ CTA)+ トップ LP 化 + FAQ + JSON-LD | 最速で効く流入増 |
-| 3 | 2〜4週目 | llms.txt + Zenn 記事 1本 + GitHub 整備 | AI 検索・開発者流入 |
-| 4 | 1〜2ヶ月 | ユースケース LP 2〜3枚 + Lighthouse 改善 | ロングテール着火 |
-| 5 | 継続 | Search Console を見て LP 追加・改稿 | 複利 |
+| フェーズ | 期間     | 内容                                                  | 期待効果            |
+| -------- | -------- | ----------------------------------------------------- | ------------------- |
+| 0        | 即決     | 独自ドメイン決定・移行                                | 全資産の蓄積先確保  |
+| 1        | 1週目    | 柱1(技術SEO基盤)+ noindex + Search Console + README   | 事故防止・計測開始  |
+| 2        | 1〜2週目 | 柱4(バイラルループ CTA)+ トップ LP 化 + FAQ + JSON-LD | 最速で効く流入増    |
+| 3        | 2〜4週目 | llms.txt + Zenn 記事 1本 + GitHub 整備                | AI 検索・開発者流入 |
+| 4        | 1〜2ヶ月 | ユースケース LP 2〜3枚 + Lighthouse 改善              | ロングテール着火    |
+| 5        | 継続     | Search Console を見て LP 追加・改稿                   | 複利                |
 
 ## 計測(効果判定の物差し)
 
